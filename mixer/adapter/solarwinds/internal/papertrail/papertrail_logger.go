@@ -29,24 +29,24 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger"
+	"github.com/satori/go.uuid"
+
 	"istio.io/istio/mixer/adapter/solarwinds/config"
 	"istio.io/istio/mixer/pkg/adapter"
-	"istio.io/istio/mixer/template/logentry"
-	"github.com/satori/go.uuid"
 	"istio.io/istio/mixer/pkg/pool"
 	"istio.io/istio/mixer/template/logentry"
 )
 
 const (
-	defaultRetention = time.Duration(24 * time.Hour)
-	keyFormat        = "TS:%d-BODY:%s"
-	keyPattern       = "TS:(\\d+)-BODY:(.*)"
-	defaultMaxDiskUsage = 5 // disk usage in percentage
-	defaultUltimateMaxDiskUsage = 99 // usage cannot go beyond this percentage value
-	defaultBatchSize = 1000 // records
-	dbLocation = "./badger"
-	cleanUpInterval = 5 * time.Second
-	defaultTemplate = `{{or (.originIp) "-"}} - {{or (.sourceUser) "-"}} ` +
+	defaultRetention            = time.Duration(24 * time.Hour)
+	keyFormat                   = "TS:%d-BODY:%s"
+	keyPattern                  = "TS:(\\d+)-BODY:(.*)"
+	defaultMaxDiskUsage         = 5    // disk usage in percentage
+	defaultUltimateMaxDiskUsage = 99   // usage cannot go beyond this percentage value
+	defaultBatchSize            = 1000 // records
+	dbLocation                  = "./badger"
+	cleanUpInterval             = 5 * time.Second
+	defaultTemplate             = `{{or (.originIp) "-"}} - {{or (.sourceUser) "-"}} ` +
 		`[{{or (.timestamp.Format "2006-01-02T15:04:05Z07:00") "-"}}] "{{or (.method) "-"}} {{or (.url) "-"}} ` +
 		`{{or (.protocol) "-"}}" {{or (.responseCode) "-"}} {{or (.responseSize) "-"}}`
 )
@@ -177,7 +177,7 @@ func (p *Logger) Log(msg *logentry.Instance) error {
 			return nil
 		})
 		if err != nil {
-			return p.log.Errorf("Error: ", err)
+			return p.log.Errorf("Error persisting log to local db: %v", err)
 		}
 	}
 	return nil
@@ -220,18 +220,16 @@ func (p *Logger) flushLogs() {
 						if err != nil {
 							if err == badger.ErrKeyNotFound {
 								return nil
-							} else {
-								return err
 							}
+							return err
 						}
 						var val []byte
 						val, err = item.ValueCopy(val)
 						if err != nil {
 							if err == badger.ErrKeyNotFound {
 								return nil
-							} else {
-								return err
 							}
+							return err
 						}
 						err = p.sendLogs(string(val))
 						if err == nil {
@@ -242,7 +240,6 @@ func (p *Logger) flushLogs() {
 							if err != nil {
 								return err
 							}
-							return nil
 						}
 						return nil
 					})
@@ -269,7 +266,7 @@ func (p *Logger) flushLogs() {
 			return nil
 		})
 		if err != nil {
-			p.log.Errorf("AO - flush logs - Error reading keys from db: ", err)
+			p.log.Errorf("AO - flush logs - Error reading keys from db: %v", err)
 		}
 		wg.Wait()
 		close(hose)
