@@ -138,7 +138,6 @@ func NewLogger(paperTrailURL string, retention time.Duration, logConfigs map[str
 	}
 
 	env.ScheduleDaemon(p.flushLogs)
-
 	env.ScheduleDaemon(p.deleteExcess)
 	env.ScheduleDaemon(p.cleanup)
 	return p, nil
@@ -165,12 +164,12 @@ func (p *Logger) Log(msg *logentry.Instance) error {
 	pool.PutBuffer(buf)
 
 	if len(payload) > 0 {
-		if p.log.VerbosityLevel(config.DebugLevel) {
-			p.log.Infof("AO - In Log method. Now persisting log: %s", msg)
-		}
-		uuid := uuid.NewV4()
+		// if p.log.VerbosityLevel(config.DebugLevel) {
+		// 	p.log.Infof("AO - In Log method. Now persisting log: %s", msg)
+		// }
+		guuid := uuid.NewV4()
 		err := p.db.Update(func(txn *badger.Txn) error {
-			err := txn.SetWithTTL([]byte(fmt.Sprintf(keyFormat, time.Now().UnixNano(), uuid)), []byte(payload), p.retentionPeriod)
+			err := txn.SetWithTTL([]byte(fmt.Sprintf(keyFormat, time.Now().UnixNano(), guuid)), []byte(payload), p.retentionPeriod)
 			if err != nil {
 				return err
 			}
@@ -205,15 +204,15 @@ func (p *Logger) flushLogs() {
 		// workers
 		for i := 0; i < p.maxWorkers; i++ {
 			go func(worker int) {
-				if p.log.VerbosityLevel(config.DebugLevel) {
-					p.log.Infof("AO - flushlogs, worker %d initialized.", (worker + 1))
-					defer p.log.Infof("AO - flushlogs, worker %d signing off.", (worker + 1))
-				}
+				// if p.log.VerbosityLevel(config.DebugLevel) {
+				// 	p.log.Infof("AO - flushlogs, worker %d initialized.", (worker + 1))
+				// 	defer p.log.Infof("AO - flushlogs, worker %d signing off.", (worker + 1))
+				// }
 
 				for key := range hose {
-					if p.log.VerbosityLevel(config.DebugLevel) {
-						p.log.Infof("AO - flushlogs, worker %d took the job.", (worker + 1))
-					}
+					// if p.log.VerbosityLevel(config.DebugLevel) {
+					// 	p.log.Infof("AO - flushlogs, worker %d took the job.", (worker + 1))
+					// }
 
 					err := p.db.Update(func(txn *badger.Txn) error {
 						item, err := txn.Get(key)
@@ -233,9 +232,9 @@ func (p *Logger) flushLogs() {
 						}
 						err = p.sendLogs(string(val))
 						if err == nil {
-							if p.log.VerbosityLevel(config.DebugLevel) {
-								p.log.Infof("AO - flushLogs, delete key: %s", key)
-							}
+							// if p.log.VerbosityLevel(config.DebugLevel) {
+							// 	p.log.Infof("AO - flushLogs, delete key: %s", key)
+							// }
 							err := txn.Delete(key)
 							if err != nil {
 								return err
@@ -277,10 +276,10 @@ func (p *Logger) flushLogs() {
 func (p *Logger) deleteExcess() {
 	for p.loopFactor {
 		currentUsage := diskUsage()
-		if p.log.VerbosityLevel(config.DebugLevel) {
-			p.log.Infof("Current disk usage: %.2f %%", currentUsage)
-			p.log.Infof("DB folder size: %.2f MB", computeDirectorySizeInMegs(dbLocation))
-		}
+		// if p.log.VerbosityLevel(config.DebugLevel) {
+		// 	p.log.Infof("Current disk usage: %.2f %%", currentUsage)
+		// 	p.log.Infof("DB folder size: %.2f MB", computeDirectorySizeInMegs(dbLocation))
+		// }
 		if currentUsage > p.initialDiskUsage+defaultMaxDiskUsage || currentUsage > defaultUltimateMaxDiskUsage {
 			// delete from beginning
 			iterations := defaultBatchSize
@@ -322,25 +321,14 @@ func (p *Logger) Close() error {
 func (p *Logger) cleanup() {
 	for p.loopFactor {
 		if p.db != nil {
-			if p.log.VerbosityLevel(config.DebugLevel) {
-				p.log.Infof("AO - cleanup - running GC")
-			}
+			// if p.log.VerbosityLevel(config.DebugLevel) {
+			// 	p.log.Infof("AO - cleanup - running GC")
+			// }
 			p.db.PurgeOlderVersions()
 			p.db.RunValueLogGC(0.99)
 		}
 		time.Sleep(cleanUpInterval)
 	}
-}
-
-func parseRetention(logRetentionStr string) time.Duration {
-	retention, err := time.ParseDuration(logRetentionStr)
-	if err != nil {
-		retention, _ = time.ParseDuration(defaultRetention)
-	}
-	if retention.Seconds() <= float64(0) {
-		retention, _ = time.ParseDuration(defaultRetention)
-	}
-	return retention
 }
 
 func diskUsage() float64 {
