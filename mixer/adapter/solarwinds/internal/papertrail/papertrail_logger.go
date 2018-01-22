@@ -1,4 +1,4 @@
-// Copyright 2017 Istio Authors.
+// Copyright 2018 Istio Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,11 +20,9 @@ import (
 	"log/syslog"
 	"net"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -38,9 +36,7 @@ import (
 )
 
 const (
-	defaultRetention            = time.Duration(24 * time.Hour)
 	keyFormat                   = "TS:%d-BODY:%s"
-	keyPattern                  = "TS:(\\d+)-BODY:(.*)"
 	defaultMaxDiskUsage         = 5    // disk usage in percentage
 	defaultUltimateMaxDiskUsage = 99   // usage cannot go beyond this percentage value
 	defaultBatchSize            = 1000 // records
@@ -51,7 +47,10 @@ const (
 		`{{or (.protocol) "-"}}" {{or (.responseCode) "-"}} {{or (.responseSize) "-"}}`
 )
 
-var defaultWorkerCount = 10
+var (
+	defaultWorkerCount = 10
+	defaultRetention   = 24 * time.Hour
+)
 
 type logInfo struct {
 	tmpl *template.Template
@@ -129,7 +128,7 @@ func NewLogger(paperTrailURL string, retention time.Duration, logConfigs map[str
 		}
 		tmpl, err := template.New(inst).Parse(templ)
 		if err != nil {
-			logger.Errorf("ao - failed to evaluate template for log instance: %s, skipping: %v", inst, err)
+			_ = logger.Errorf("ao - failed to evaluate template for log instance: %s, skipping: %v", inst, err)
 			continue
 		}
 		p.logInfos[inst] = &logInfo{
@@ -157,7 +156,7 @@ func (p *Logger) Log(msg *logentry.Instance) error {
 	}
 
 	if err := linfo.tmpl.Execute(buf, msg.Variables); err != nil {
-		p.log.Errorf("failed to execute template for log '%s': %v", msg.Name, err)
+		_ = p.log.Errorf("failed to execute template for log '%s': %v", msg.Name, err)
 		// proceeding anyways
 	}
 	payload := buf.String()
@@ -168,14 +167,9 @@ func (p *Logger) Log(msg *logentry.Instance) error {
 		// 	p.log.Infof("AO - In Log method. Now persisting log: %s", msg)
 		// }
 		guuid := uuid.NewV4()
-		err := p.db.Update(func(txn *badger.Txn) error {
-			err := txn.SetWithTTL([]byte(fmt.Sprintf(keyFormat, time.Now().UnixNano(), guuid)), []byte(payload), p.retentionPeriod)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err != nil {
+		if err := p.db.Update(func(txn *badger.Txn) error {
+			return txn.SetWithTTL([]byte(fmt.Sprintf(keyFormat, time.Now().UnixNano(), guuid)), []byte(payload), p.retentionPeriod)
+		}); err != nil {
 			return p.log.Errorf("Error persisting log to local db: %v", err)
 		}
 	}
@@ -187,9 +181,10 @@ func (p *Logger) sendLogs(data string) error {
 	if err != nil {
 		return p.log.Errorf("ao - Failed to dial syslog: %v", err)
 	}
-	defer writer.Close()
-	err = writer.Info(data)
-	if err != nil {
+	defer func() {
+		_ = writer.Close()
+	}()
+	if err = writer.Info(data); err != nil {
 		return p.log.Errorf("failed to send log msg to papertrail: %v", err)
 	}
 	return nil
@@ -199,55 +194,11 @@ func (p *Logger) sendLogs(data string) error {
 func (p *Logger) flushLogs() {
 	for p.loopFactor {
 		hose := make(chan []byte, p.maxWorkers)
-		var wg sync.WaitGroup
+		wg := new(sync.WaitGroup)
 
 		// workers
 		for i := 0; i < p.maxWorkers; i++ {
-			go func(worker int) {
-				// if p.log.VerbosityLevel(config.DebugLevel) {
-				// 	p.log.Infof("AO - flushlogs, worker %d initialized.", (worker + 1))
-				// 	defer p.log.Infof("AO - flushlogs, worker %d signing off.", (worker + 1))
-				// }
-
-				for key := range hose {
-					// if p.log.VerbosityLevel(config.DebugLevel) {
-					// 	p.log.Infof("AO - flushlogs, worker %d took the job.", (worker + 1))
-					// }
-
-					err := p.db.Update(func(txn *badger.Txn) error {
-						item, err := txn.Get(key)
-						if err != nil {
-							if err == badger.ErrKeyNotFound {
-								return nil
-							}
-							return err
-						}
-						var val []byte
-						val, err = item.ValueCopy(val)
-						if err != nil {
-							if err == badger.ErrKeyNotFound {
-								return nil
-							}
-							return err
-						}
-						err = p.sendLogs(string(val))
-						if err == nil {
-							// if p.log.VerbosityLevel(config.DebugLevel) {
-							// 	p.log.Infof("AO - flushLogs, delete key: %s", key)
-							// }
-							err := txn.Delete(key)
-							if err != nil {
-								return err
-							}
-						}
-						return nil
-					})
-					if err != nil {
-						p.log.Errorf("Error while deleting key: %s - error: %v", key, err)
-					}
-					wg.Done()
-				}
-			}(i)
+			p.env.ScheduleDaemon(p.flushWorker(hose, wg))
 		}
 
 		err := p.db.View(func(txn *badger.Txn) error {
@@ -265,11 +216,59 @@ func (p *Logger) flushLogs() {
 			return nil
 		})
 		if err != nil {
-			p.log.Errorf("AO - flush logs - Error reading keys from db: %v", err)
+			_ = p.log.Errorf("AO - flush logs - Error reading keys from db: %v", err)
 		}
 		wg.Wait()
 		close(hose)
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (p *Logger) flushWorker(hose chan []byte, wg *sync.WaitGroup) func() {
+	return func() {
+		// if p.log.VerbosityLevel(config.DebugLevel) {
+		// 	p.log.Infof("AO - flushlogs, worker %d initialized.", (worker + 1))
+		// 	defer p.log.Infof("AO - flushlogs, worker %d signing off.", (worker + 1))
+		// }
+
+		for key := range hose {
+			// if p.log.VerbosityLevel(config.DebugLevel) {
+			// 	p.log.Infof("AO - flushlogs, worker %d took the job.", (worker + 1))
+			// }
+
+			err := p.db.Update(func(txn *badger.Txn) error {
+				item, err := txn.Get(key)
+				if err != nil {
+					if err == badger.ErrKeyNotFound {
+						return nil
+					}
+					return err
+				}
+				var val []byte
+				val, err = item.ValueCopy(val)
+				if err != nil {
+					if err == badger.ErrKeyNotFound {
+						return nil
+					}
+					return err
+				}
+				err = p.sendLogs(string(val))
+				if err == nil {
+					// if p.log.VerbosityLevel(config.DebugLevel) {
+					// 	p.log.Infof("AO - flushLogs, delete key: %s", key)
+					// }
+					err := txn.Delete(key)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
+				_ = p.log.Errorf("Error while deleting key: %s - error: %v", key, err)
+			}
+			wg.Done()
+		}
 	}
 }
 
@@ -292,7 +291,7 @@ func (p *Logger) deleteExcess() {
 					item := it.Item()
 					k := make([]byte, len(item.Key()))
 					copy(k, item.Key())
-					txn.Delete(k)
+					_ = txn.Delete(k)
 					iterations--
 					if iterations < 0 {
 						break
@@ -301,7 +300,7 @@ func (p *Logger) deleteExcess() {
 				return nil
 			})
 			if err != nil {
-				p.log.Errorf("AO - deleteExcess - Error while deleting - error: %v", err)
+				_ = p.log.Errorf("AO - deleteExcess - Error while deleting - error: %v", err)
 			}
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -324,8 +323,8 @@ func (p *Logger) cleanup() {
 			// if p.log.VerbosityLevel(config.DebugLevel) {
 			// 	p.log.Infof("AO - cleanup - running GC")
 			// }
-			p.db.PurgeOlderVersions()
-			p.db.RunValueLogGC(0.99)
+			_ = p.db.PurgeOlderVersions()
+			_ = p.db.RunValueLogGC(0.99)
 		}
 		time.Sleep(cleanUpInterval)
 	}
@@ -334,19 +333,19 @@ func (p *Logger) cleanup() {
 func diskUsage() float64 {
 	var stat syscall.Statfs_t
 	wd, _ := os.Getwd()
-	syscall.Statfs(wd, &stat)
+	_ = syscall.Statfs(wd, &stat)
 	avail := stat.Bavail * uint64(stat.Bsize)
 	used := stat.Blocks * uint64(stat.Bsize)
 	return (float64(used) / float64(used+avail)) * 100
 }
 
-func computeDirectorySizeInMegs(fullPath string) float64 {
-	var sizeAccumulator int64
-	filepath.Walk(fullPath, func(path string, file os.FileInfo, err error) error {
-		if !file.IsDir() {
-			atomic.AddInt64(&sizeAccumulator, file.Size())
-		}
-		return nil
-	})
-	return float64(atomic.LoadInt64(&sizeAccumulator)) / (1024 * 1024)
-}
+//func computeDirectorySizeInMegs(fullPath string) float64 {
+//	var sizeAccumulator int64
+//	filepath.Walk(fullPath, func(path string, file os.FileInfo, err error) error {
+//		if !file.IsDir() {
+//			atomic.AddInt64(&sizeAccumulator, file.Size())
+//		}
+//		return nil
+//	})
+//	return float64(atomic.LoadInt64(&sizeAccumulator)) / (1024 * 1024)
+//}
