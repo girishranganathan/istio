@@ -83,6 +83,8 @@ type Logger struct {
 	maxWorkers int
 
 	loopFactor bool
+
+	loopWait chan struct{}
 }
 
 // NewLogger does some ground work and returns an instance of LoggerInterface
@@ -105,16 +107,16 @@ func NewLogger(paperTrailURL string, retention time.Duration, logConfigs map[str
 	logger.Infof("Creating a new paper trail logger for url: %s", paperTrailURL)
 
 	p := &Logger{
-		paperTrailURL:   paperTrailURL,
-		retentionPeriod: retention,
-		cmap:            &sync.Map{},
-		log:             logger,
-		env:             env,
-		maxWorkers:      defaultWorkerCount * runtime.NumCPU(),
-		loopFactor:      true,
-
+		paperTrailURL:    paperTrailURL,
+		retentionPeriod:  retention,
+		cmap:             &sync.Map{},
+		log:              logger,
+		env:              env,
+		maxWorkers:       defaultWorkerCount * runtime.NumCPU(),
+		loopFactor:       true,
 		db:               db,
 		initialDiskUsage: diskUsage(),
+		loopWait:         make(chan struct{}),
 	}
 
 	p.logInfos = map[string]*logInfo{}
@@ -128,7 +130,7 @@ func NewLogger(paperTrailURL string, retention time.Duration, logConfigs map[str
 		}
 		tmpl, err := template.New(inst).Parse(templ)
 		if err != nil {
-			_ = logger.Errorf("ao - failed to evaluate template for log instance: %s, skipping: %v", inst, err)
+			_ = logger.Errorf("failed to evaluate template for log instance: %s, skipping: %v", inst, err)
 			continue
 		}
 		p.logInfos[inst] = &logInfo{
@@ -179,11 +181,9 @@ func (p *Logger) Log(msg *logentry.Instance) error {
 func (p *Logger) sendLogs(data string) error {
 	writer, err := syslog.Dial("udp", p.paperTrailURL, syslog.LOG_EMERG|syslog.LOG_KERN, "istio")
 	if err != nil {
-		return p.log.Errorf("ao - Failed to dial syslog: %v", err)
+		return p.log.Errorf("Failed to dial syslog: %v", err)
 	}
-	defer func() {
-		_ = writer.Close()
-	}()
+	defer func() { _ = writer.Close() }()
 	if err = writer.Info(data); err != nil {
 		return p.log.Errorf("failed to send log msg to papertrail: %v", err)
 	}
@@ -192,6 +192,9 @@ func (p *Logger) sendLogs(data string) error {
 
 // This should be run in a routine
 func (p *Logger) flushLogs() {
+	defer func() {
+		p.loopWait <- struct{}{}
+	}()
 	for p.loopFactor {
 		hose := make(chan []byte, p.maxWorkers)
 		wg := new(sync.WaitGroup)
@@ -310,10 +313,12 @@ func (p *Logger) deleteExcess() {
 // Close - closes the Logger instance
 func (p *Logger) Close() error {
 	p.loopFactor = false
+	defer close(p.loopWait)
 	time.Sleep(time.Second)
 	if p.db != nil {
 		return p.db.Close()
 	}
+	<-p.loopWait
 	return nil
 }
 
