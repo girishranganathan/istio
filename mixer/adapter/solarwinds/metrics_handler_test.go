@@ -71,7 +71,17 @@ func TestHandleMetric(t *testing.T) {
 	logger.Infof("Starting %s - test run. . .\n", t.Name())
 	defer logger.Infof("Finished %s - test run. . .", t.Name())
 
-	mhi, err := newMetricsHandler(ctx, test2.NewEnv(t), &config.Params{})
+	mhi, err := newMetricsHandler(ctx, test2.NewEnv(t), &config.Params{
+		Metrics: map[string]*config.Params_MetricInfo{
+			"m1": {
+				LabelNames: []string{"tag1"},
+			},
+			"m2": {
+				LabelNames: []string{"tag2"},
+			},
+		},
+	})
+
 	if err != nil {
 		t.Errorf("Unexpected error while running %s test - %v", t.Name(), err)
 		return
