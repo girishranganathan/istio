@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	defaultTag = "0.4.0"
+	defaultTag          = "0.4.0"
+	defaultHyperkubeTag = "v1.7.6_coreos.0"
 )
 
 // Command returns the "gen-deploy" subcommand for istioctl.
@@ -43,7 +44,7 @@ func Command(istioNamespaceFlag *string) *cobra.Command {
 		Long: "istioctl gen-deploy produces deployment files to run the minimum Istio control for the set of " +
 			"features requested by the --feature flag. If no features are provided, we create deployments for the " +
 			"default control plane: Pilot, Mixer, CA, and Ingress Proxies, with mTLS enabled.",
-		Example: `istioctl gen-deploy --features routing,policy,initializer -o helm`,
+		Example: `istioctl gen-deploy --features routing,policy,sidecar-injector -o helm`,
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := install.setFeatures(*features); err != nil {
 				return err
@@ -74,7 +75,7 @@ func Command(istioNamespaceFlag *string) *cobra.Command {
 		"deployments locally when --out=yaml. Flag values are ignored in favor of using the file directly.")
 
 	features = cmd.PersistentFlags().StringArrayP("features", "f", []string{},
-		`List of Istio features to enable. Accepts any combination of "mtls", "telemetry", "routing", "ingress", "policy", "initializer".`)
+		`List of Istio features to enable. Accepts any combination of "mtls", "telemetry", "routing", "ingress", "policy", "sidecar-injector".`)
 	cmd.PersistentFlags().StringVar(&install.Hub, "hub", install.Hub, "The container registry to pull Istio images from")
 	cmd.PersistentFlags().StringVar(&install.MixerTag, "mixer-tag", install.MixerTag, "The tag to use to pull the `mixer` container")
 	cmd.PersistentFlags().StringVar(&install.PilotTag, "pilot-tag", install.PilotTag, "The tag to use to pull the `pilot-discovery` container")
@@ -84,13 +85,15 @@ func Command(istioNamespaceFlag *string) *cobra.Command {
 	cmd.PersistentFlags().Uint16Var(&install.NodePort, "ingress-node-port", install.NodePort,
 		"If provided, Istio ingress proxies will run as a NodePort service mapped to the port provided by this flag. "+
 			"Note that this flag is ignored unless the \"ingress\" feature flag is provided too.")
-	cmd.PersistentFlags().StringVarP(&out, "out", "o", "helm", `Output format. Acceptable values are:
-					"helm": produces contents of values.yaml
-					"yaml": produces Kubernetes deployments`)
+	cmd.PersistentFlags().StringVarP(&out, "out", "o", "helm", "Output format. Acceptable values are"+
+		"'helm' to produce contents of values.yaml or 'helm' to produces Kubernetes deployments")
 
 	// TODO: figure out how we want to package up the charts with the binary to make this easy
 	cmd.PersistentFlags().StringVar(&helmChartLocation, "helm-chart-dir", ".",
 		"The directory to find the helm charts used to render Istio deployments. -o yaml uses these to render the helm chart locally.")
+
+	cmd.PersistentFlags().StringVar(&install.HyperkubeHub, "hyperkube-hub", install.HyperkubeHub, "The container registry to pull Hyperkube images from")
+	cmd.PersistentFlags().StringVar(&install.HyperkubeTag, "hyperkube-tag", install.MixerTag, "The tag to use to pull the `Hyperkube` container")
 
 	_ = cmd.PersistentFlags().MarkHidden("hub")
 	_ = cmd.PersistentFlags().MarkHidden("mixer-tag")
@@ -113,15 +116,7 @@ func getValues(path string, i *installation) (string, error) {
 }
 
 type installation struct {
-	Mixer       bool
-	Pilot       bool
-	CA          bool
-	Ingress     bool
-	Initializer bool
-
 	Namespace string
-	Debug     bool
-	NodePort  uint16
 
 	// todo: support hub per component
 	Hub      string // hub to pull images from
@@ -129,15 +124,27 @@ type installation struct {
 	PilotTag string
 	CaTag    string
 	ProxyTag string
+
+	HyperkubeHub string
+	HyperkubeTag string
+
+	NodePort uint16
+	Debug    bool
+
+	Mixer           bool
+	Pilot           bool
+	CA              bool
+	Ingress         bool
+	SidecarInjector bool
 }
 
 func defaultInstall() *installation {
 	return &installation{
-		Mixer:       true,
-		Pilot:       true,
-		CA:          true,
-		Ingress:     true,
-		Initializer: false,
+		Mixer:           true,
+		Pilot:           true,
+		CA:              true,
+		Ingress:         true,
+		SidecarInjector: false,
 
 		Namespace: "istio-system",
 		Debug:     false,
@@ -148,19 +155,24 @@ func defaultInstall() *installation {
 		PilotTag: defaultTag,
 		CaTag:    defaultTag,
 		ProxyTag: defaultTag,
+
+		HyperkubeHub: "quay.io/coreos/hyperkube",
+		HyperkubeTag: defaultHyperkubeTag,
 	}
 }
 
 func (i *installation) setFeatures(features []string) error {
 	if len(features) == 0 {
 		return nil
+	} else if len(features) == 1 {
+		features = strings.Split(features[0], ",")
 	}
 
 	i.Mixer = false
 	i.Pilot = false
 	i.CA = false
 	i.Ingress = false
-	i.Initializer = false
+	i.SidecarInjector = false
 	for _, f := range features {
 		switch strings.ToLower(f) {
 		case "telemetry", "policy":
@@ -174,8 +186,8 @@ func (i *installation) setFeatures(features []string) error {
 		case "ingress":
 			i.Ingress = true
 			i.Pilot = true
-		case "initializer":
-			i.Initializer = true
+		case "sidecar-injector":
+			i.SidecarInjector = true
 		default:
 			return fmt.Errorf("invalid feature name %q", f)
 		}

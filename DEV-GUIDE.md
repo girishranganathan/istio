@@ -1,8 +1,9 @@
 # Developing for Istio
 
-This document helps you get started to develop code for Istio.
-If you're following this guide and find some problem, please [submit an issue](https://github.com/istio/istio/issues/new).
-so we can improve the doc.
+This document helps you get started developing code for Istio.
+If you follow this guide and find some problem, please [submit an issue](https://github.com/istio/istio/issues/new),
+so we can improve the document.
+Also check [Troubleshooting](DEV-TROUBLESHOOTING.md).
 
 - [Prerequisites](#prerequisites)
   - [Setting up Go](#setting-up-go)
@@ -18,6 +19,7 @@ so we can improve the doc.
   - [Building and pushing the containers](#building-and-pushing-the-containers)
   - [Building the Istio manifests](#building-the-istio-manifests)
   - [Cleaning outputs](#cleaning-outputs)
+  - [Debug an Istio container with Delve](#debug-an-istio-container-with-delve)
   - [Running tests](#running-tests)
   - [Getting coverage numbers](#getting-coverage-numbers)
   - [Auto-formatting source code](#auto-formatting-source-code)
@@ -25,6 +27,17 @@ so we can improve the doc.
   - [Running race detection tests](#running-race-detection-tests)
   - [Adding dependencies](#adding-dependencies)
   - [About testing](#about-testing)
+- [Working with CircleCI](#working-with-circleci)
+- [Git workflow](#git-workflow)
+  - [Fork the main repository](#fork-the-main-repository)
+  - [Clone your fork](#clone-your-fork)
+  - [Enable pre commit hook](#enable-pre-commit-hook)
+  - [Create a branch and make changes](#create-a-branch-and-make-changes)
+  - [Keeping your fork in sync](#keeping-your-fork-in-sync)
+  - [Committing changes to your fork](#committing-changes-to-your-fork)
+  - [Creating a pull request](#creating-a-pull-request)
+  - [Getting a code review](#getting-a-code-review)
+  - [When to retain commits and when to squash](#when-to-retain-commits-and-when-to-squash)
 
 This document is intended to be relative to the branch in which it is found.
 It is guaranteed that requirements will change over time for the development
@@ -33,7 +46,7 @@ branch, but release branches should not change.
 ## Prerequisites
 
 Istio components only have few external dependencies you
-need to setup before being able to build and run the code.
+need to set up before being able to build and run the code.
 
 ### Setting up Go
 
@@ -62,24 +75,24 @@ Kubernetes version 1.7.3 or higher. Follow the steps outlined in the
 _prerequisites_ section in the
 [Istio Quick Start](https://istio.io/docs/setup/kubernetes/quick-start.html)
 to setup a Kubernetes cluster with Minikube, or launch a cluster in IBM
-Cloud Container Service, Google Kubernetes Engine or Openshift.
+Cloud Container Service, Google Kubernetes Engine or OpenShift.
 
 #### Additional steps for GKE
 
-* Add `--no-enable-legacy-authorization` to the list of gcloud flags to fully
+- Add `--no-enable-legacy-authorization` to the list of gcloud flags to fully
 enable RBAC in GKE.
 
-* Update your kubeconfig file with appropriate credentials to point kubectl
+- Update your kubeconfig file with appropriate credentials to point kubectl
 to the cluster created in GKE.
 
-  ```
+```shell
   gcloud container clusters get-credentials NAME --zone=ZONE
   ```
 
-* Make sure you are using static client certificates before fetching cluster
+- Make sure you are using static client certificates before fetching cluster
 credentials:
 
-  ```
+```shell
   gcloud config set container/use_client_certificate True
   ```
 
@@ -134,15 +147,14 @@ export KUBECONFIG=${HOME}/.kube/config
 
 ```
 
-Execute a one time operation to contain the Istio source trees.
+Execute once, to create a directory for the Istio source trees.
 
 ```shell
 mkdir -p $ISTIO
 ```
 
-As the steps recommmended in this section change both the user's groups
-information as well as the $PATH and environment, please logout of the
-development machine and log in to reload the environment.
+As the steps recommended in this section change the $PATH and environment,
+you will need to reload the environment.
 
 ### Setting up a personal access token
 
@@ -169,6 +181,14 @@ make
 This build command figures out what it needs to do and does not need any
 input from you.
 
+To build those components with debugger information so that a debugger such as
+[Delve](https://github.com/derekparker/delve) can be used to debug them, run
+
+
+```shell
+make DEBUG=1
+```
+
 *TIP*: To speed up consecutive builds of the project, run the following
 command instead:
 
@@ -192,6 +212,13 @@ Build the containers in your local docker cache:
 make docker
 ```
 
+To build the containers with the debugger information so that they can be
+debugged with a debugger such as [Delve](https://github.com/derekparker), run
+
+```shell
+make DEBUG=1 docker
+```
+
 Push the containers to your registry:
 
 ```shell
@@ -203,7 +230,7 @@ make push
 Use [updateVersion.sh](https://github.com/istio/istio/blob/master/install/updateVersion.sh)
 to generate new manifests with mixer, pilot, and ca_cert custom built containers:
 
-```
+```shell
 install/updateVersion.sh -a ${HUB},${TAG}
 ```
 
@@ -214,6 +241,29 @@ You can delete any build artifacts with:
 ```shell
 make clean
 ```
+
+### Debug an Istio container with Delve
+
+To debug an Istio container with Delve in a Kubernetes environment:
+
+* Locate the Kubernetes node on which your container is running.
+* Make sure that the node has Go tool installed as described in above.
+* Make sure the node has [Delve installed](https://github.com/derekparker/delve/tree/master/Documentation/installation).
+* Clone the Istio repo from which your debuggable executables
+   have been built onto the node.
+* Log on to the node and find out the process id that you'd like to debug. For
+   example, if you want to debug Pilot, the process name is pilot-discovery.
+   Issue command ```ps -ef | grep pilot-discovery``` to find the process id.
+* Issue the command ```sudo dlv attach <pilot-pid>``` to start the debug
+   session.
+
+You may find this [Delve tutorial](http://blog.ralch.com/tutorial/golang-debug-with-delve/) is useful.
+
+Alternatively, you can use [Squash](https://github.com/solo-io/squash) with
+Delve to debug your container. You may need to modify the Istio Dockerfile to
+use a base image such as alpine (versus scratch in Pilot Dockerfiles). One of
+the benefits of using Squash is that you don't need to install Go tool and Delve
+on every Kubernetes nodes.
 
 ### Running tests
 
@@ -228,8 +278,8 @@ such as invoking the Envoy proxy with a special configuration, we capture
 the desired output as golden artifacts and save the artifacts in the
 repository. Validation tests compare generated output against the desired
 output. For example,
-[Envoy configuration test data](pilot/proxy/envoy/testdata) contains
-auto-generated proxy configuration. If you make changes to the config
+[Envoy configuration test data](pilot/pkg/proxy/envoy/testdata) contains
+auto-generated proxy configuration. If you make changes to the configuration
 generation, you also need to create or update the golden artifact in the
 same pull request. The test library can automatically refresh all golden
 artifacts if you pass a special environment variable:
@@ -295,13 +345,27 @@ Before sending pull requests you should at least make sure your changes have
 passed both unit and integration tests. We only merge pull requests when
 **all** tests are passing.
 
-* Unit tests should be fully hermetic
+- Unit tests should be fully hermetic
   - Only access resources in the test binary.
-* All packages and any significant files require unit tests.
-* Unit tests are written using the standard Go testing package.
-* The preferred method of testing multiple scenarios or input is
+- All packages and any significant files require unit tests.
+- Unit tests are written using the standard Go testing package.
+- The preferred method of testing multiple scenarios or input is
   [table driven testing](https://github.com/golang/go/wiki/TableDrivenTests)
-* Concurrent unit test runs must pass.
+- Concurrent unit test runs must pass.
+
+## Working with CircleCI
+
+We use CircleCI as one of the systems for continuous integration. Any PR
+will have to pass all CircleCI tests (in addition to Prow tests) before
+being ready to merge. When you fork the Istio repository, you will
+automatically inherit the CircleCI testing environment as well, allowing
+you to fully reproduce our testing infrastructure. If you have already
+signed up for CircleCI, you can test your code changes in your fork against
+the full suite of tests that we run for every PR.
+
+Please refer to the
+[wiki](https://github.com/istio/istio/wiki/Working-with-CircleCI) for a
+detailed guide on using CircleCI with Istio.
 
 ## Git workflow
 
@@ -311,7 +375,7 @@ Other Git workflows are also valid.
 ### Fork the main repository
 
 1. Go to https://github.com/istio/istio
-2. Click the "Fork" button (at the top right)
+1. Click the "Fork" button (at the top right)
 
 ### Clone your fork
 
@@ -322,9 +386,9 @@ there is more than one directory in your `$GOPATH`.
 
 ```shell
 cd $ISTIO
-git clone https://github.com/$GITHUB_USER/istio.git
+git clone https://github.com/$GITHUB_USER/istio
 cd istio
-git remote add upstream 'https://github.com/istio/istio.git'
+git remote add upstream 'https://github.com/istio/istio'
 git config --global --add http.followRedirects 1
 ```
 
@@ -337,10 +401,12 @@ Istio uses a local pre-commit hook to ensure that the code
 passes local tests before being committed.
 
 Run
+
 ```shell
 ./bin/pre-commit
 Installing pre-commit hook
 ```
+
 This hook is invoked every time you commit changes locally.
 The commit is allowed to proceed only if the hook succeeds.
 
@@ -374,7 +440,8 @@ When you're happy with some changes, you can commit them to your repo:
 git add .
 git commit
 ```
-Then push the change to the fork. When prompted for authentication, use your
+
+Then push the change to your fork (typically called `origin`). When prompted for authentication, use your
 GitHub username as usual but the personal access token as your password if you
 have not setup ssh keys. Please
 follow [these instructions](https://help.github.com/articles/caching-your-github-password-in-git/#platform-linux)
@@ -386,8 +453,8 @@ git push origin my-feature
 
 ### Creating a pull request
 
-1. Visit https://github.com/$GITHUB_USER/istio if you created a fork in your own github repostiory, or https://github.com/istio/istio and navigate to your branch (e.g. "my-feature").
-2. Click the "Compare" button to compare the change, and then the "Pull request" button next to your "my-feature" branch.
+1. Visit https://github.com/$GITHUB_USER/istio if you created a fork in your own github repository, or https://github.com/istio/istio and navigate to your branch (e.g. "my-feature").
+1. Click the "Compare" button to compare the change, and then the "Pull request" button next to your "my-feature" branch.
 
 ### Getting a code review
 

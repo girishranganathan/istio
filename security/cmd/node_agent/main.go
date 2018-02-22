@@ -16,20 +16,30 @@ package main
 
 import (
 	"os"
+	"time"
 
-	// TODO(nmittler): Remove this
-	_ "github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 
+	"istio.io/istio/pkg/collateral"
 	"istio.io/istio/pkg/log"
+	"istio.io/istio/pkg/version"
 	"istio.io/istio/security/cmd/node_agent/na"
 	"istio.io/istio/security/pkg/cmd"
+)
+
+const (
+	// The default path/file of root cert.
+	defaultRoot = "/etc/certs/root-cert.pem"
 )
 
 var (
 	naConfig = na.NewConfig()
 
 	rootCmd = &cobra.Command{
+		Use:   "node_agent",
+		Short: "Istio security per-node agent",
+
 		Run: func(cmd *cobra.Command, args []string) {
 			runNodeAgent()
 		},
@@ -37,9 +47,18 @@ var (
 )
 
 func init() {
+	rootCmd.AddCommand(version.CobraCommand())
+	rootCmd.AddCommand(collateral.CobraCommand(rootCmd, &doc.GenManHeader{
+		Title:   "Istio Node Agent",
+		Section: "node_agent CLI",
+		Manual:  "Istio Node Agent",
+	}))
+
 	flags := rootCmd.Flags()
 
 	flags.StringVar(&naConfig.ServiceIdentityOrg, "org", "", "Organization for the cert")
+	flags.DurationVar(&naConfig.WorkloadCertTTL, "workload-cert-ttl", 12*time.Hour,
+		"The requested TTL for the workload")
 	flags.IntVar(&naConfig.RSAKeySize, "key-size", 2048, "Size of generated private key")
 	flags.StringVar(&naConfig.IstioCAAddress,
 		"ca-address", "istio-ca:8060", "Istio CA address")
@@ -50,15 +69,15 @@ func init() {
 	flags.StringVar(&naConfig.PlatformConfig.OnPremConfig.KeyFile,
 		"onprem-key", "/etc/certs/key.pem", "Node identity private key file in on premise environment")
 	flags.StringVar(&naConfig.PlatformConfig.OnPremConfig.RootCACertFile, "onprem-root-cert",
-		"/etc/certs/root-cert.pem", "Root Certificate file in on premise environment")
+		defaultRoot, "Root Certificate file in on premise environment")
 
 	flags.StringVar(&naConfig.PlatformConfig.GcpConfig.RootCACertFile, "gcp-root-cert",
-		"/etc/certs/root-cert.pem", "Root Certificate file in GCP environment")
+		defaultRoot, "Root Certificate file in GCP environment")
 	flags.StringVar(&naConfig.PlatformConfig.GcpConfig.CAAddr, "gcp-ca-address",
 		"istio-ca:8060", "Istio CA address in GCP environment")
 
 	flags.StringVar(&naConfig.PlatformConfig.AwsConfig.RootCACertFile, "aws-root-cert",
-		"/etc/certs/root-cert.pem", "Root Certificate file in AWS environment")
+		defaultRoot, "Root Certificate file in AWS environment")
 
 	naConfig.LoggingOptions.AttachCobraFlags(rootCmd)
 	cmd.InitializeFlags(rootCmd)

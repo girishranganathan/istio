@@ -25,11 +25,11 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 
-	"istio.io/api/mixer/v1/config/descriptor"
+	istio_mixer_v1_config "istio.io/api/mixer/v1/config"
+	istio_mixer_v1_config_descriptor "istio.io/api/mixer/v1/config/descriptor"
 	adptTmpl "istio.io/api/mixer/v1/template"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/attribute"
-	"istio.io/istio/mixer/pkg/config/proto"
 	"istio.io/istio/mixer/pkg/expr"
 	"istio.io/istio/mixer/pkg/il/compiled"
 	"istio.io/istio/mixer/pkg/template"
@@ -114,29 +114,29 @@ func (w *wrapperAttr) DebugString() string {
 var (
 	SupportedTmplInfo = map[string]template.Info{
 
-		adapter_template_kubernetesenv.TemplateName: {
-			Name:               adapter_template_kubernetesenv.TemplateName,
-			Impl:               "adapter.template.kubernetesenv",
-			CtrCfg:             &adapter_template_kubernetesenv.InstanceParam{},
+		adapter_template_kubernetes.TemplateName: {
+			Name:               adapter_template_kubernetes.TemplateName,
+			Impl:               "adapter.template.kubernetes",
+			CtrCfg:             &adapter_template_kubernetes.InstanceParam{},
 			Variety:            adptTmpl.TEMPLATE_VARIETY_ATTRIBUTE_GENERATOR,
-			BldrInterfaceName:  adapter_template_kubernetesenv.TemplateName + "." + "HandlerBuilder",
-			HndlrInterfaceName: adapter_template_kubernetesenv.TemplateName + "." + "Handler",
+			BldrInterfaceName:  adapter_template_kubernetes.TemplateName + "." + "HandlerBuilder",
+			HndlrInterfaceName: adapter_template_kubernetes.TemplateName + "." + "Handler",
 			BuilderSupportsTemplate: func(hndlrBuilder adapter.HandlerBuilder) bool {
-				_, ok := hndlrBuilder.(adapter_template_kubernetesenv.HandlerBuilder)
+				_, ok := hndlrBuilder.(adapter_template_kubernetes.HandlerBuilder)
 				return ok
 			},
 			HandlerSupportsTemplate: func(hndlr adapter.Handler) bool {
-				_, ok := hndlr.(adapter_template_kubernetesenv.Handler)
+				_, ok := hndlr.(adapter_template_kubernetes.Handler)
 				return ok
 			},
 			InferType: func(cp proto.Message, tEvalFn template.TypeEvalFn) (proto.Message, error) {
 
-				var BuildTemplate func(param *adapter_template_kubernetesenv.InstanceParam,
+				var BuildTemplate func(param *adapter_template_kubernetes.InstanceParam,
 					path string) (proto.Message, error)
 
 				_ = BuildTemplate
 
-				BuildTemplate = func(param *adapter_template_kubernetesenv.InstanceParam,
+				BuildTemplate = func(param *adapter_template_kubernetes.InstanceParam,
 					path string) (proto.Message, error) {
 
 					if param == nil {
@@ -145,73 +145,67 @@ var (
 
 					var err error = nil
 
-					if param.SourceUid == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"SourceUid")
-					}
-					if t, e := tEvalFn(param.SourceUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SourceUid", e)
+					if param.SourceUid != "" {
+						if t, e := tEvalFn(param.SourceUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SourceUid", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SourceUid", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SourceUid", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.SourceIp == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"SourceIp")
-					}
-					if t, e := tEvalFn(param.SourceIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SourceIp", e)
+					if param.SourceIp != "" {
+						if t, e := tEvalFn(param.SourceIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SourceIp", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SourceIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SourceIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 					}
 
-					if param.DestinationUid == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"DestinationUid")
-					}
-					if t, e := tEvalFn(param.DestinationUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"DestinationUid", e)
+					if param.DestinationUid != "" {
+						if t, e := tEvalFn(param.DestinationUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"DestinationUid", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"DestinationUid", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"DestinationUid", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.DestinationIp == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"DestinationIp")
-					}
-					if t, e := tEvalFn(param.DestinationIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"DestinationIp", e)
+					if param.DestinationIp != "" {
+						if t, e := tEvalFn(param.DestinationIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"DestinationIp", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"DestinationIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"DestinationIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 					}
 
-					if param.OriginUid == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"OriginUid")
-					}
-					if t, e := tEvalFn(param.OriginUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"OriginUid", e)
+					if param.OriginUid != "" {
+						if t, e := tEvalFn(param.OriginUid); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"OriginUid", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"OriginUid", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"OriginUid", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.OriginIp == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"OriginIp")
-					}
-					if t, e := tEvalFn(param.OriginIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"OriginIp", e)
+					if param.OriginIp != "" {
+						if t, e := tEvalFn(param.OriginIp); e != nil || t != istio_mixer_v1_config_descriptor.IP_ADDRESS {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"OriginIp", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"OriginIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"OriginIp", t, istio_mixer_v1_config_descriptor.IP_ADDRESS)
 					}
 
 					return nil, err
 
 				}
 
-				instParam := cp.(*adapter_template_kubernetesenv.InstanceParam)
+				instParam := cp.(*adapter_template_kubernetes.InstanceParam)
 
-				const fullOutName = "adapter_template_kubernetesenv.output."
+				const fullOutName = "adapter_template_kubernetes.output."
 				for attr, exp := range instParam.AttributeBindings {
 					expr := strings.Replace(exp, "$out.", fullOutName, -1)
 					t1, err := tEvalFn(expr)
@@ -236,87 +230,87 @@ var (
 				{
 					Attributes: map[string]*istio_mixer_v1_config.AttributeManifest_AttributeInfo{
 
-						"adapter_template_kubernetesenv.output.source_pod_ip": {
+						"adapter_template_kubernetes.output.source_pod_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 
-						"adapter_template_kubernetesenv.output.source_pod_name": {
+						"adapter_template_kubernetes.output.source_pod_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.source_labels": {
+						"adapter_template_kubernetes.output.source_labels": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING_MAP,
 						},
 
-						"adapter_template_kubernetesenv.output.source_namespace": {
+						"adapter_template_kubernetes.output.source_namespace": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.source_service": {
+						"adapter_template_kubernetes.output.source_service": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.source_service_account_name": {
+						"adapter_template_kubernetes.output.source_service_account_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.source_host_ip": {
+						"adapter_template_kubernetes.output.source_host_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_pod_ip": {
+						"adapter_template_kubernetes.output.destination_pod_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_pod_name": {
+						"adapter_template_kubernetes.output.destination_pod_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_labels": {
+						"adapter_template_kubernetes.output.destination_labels": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING_MAP,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_namespace": {
+						"adapter_template_kubernetes.output.destination_namespace": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_service": {
+						"adapter_template_kubernetes.output.destination_service": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_service_account_name": {
+						"adapter_template_kubernetes.output.destination_service_account_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.destination_host_ip": {
+						"adapter_template_kubernetes.output.destination_host_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_pod_ip": {
+						"adapter_template_kubernetes.output.origin_pod_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_pod_name": {
+						"adapter_template_kubernetes.output.origin_pod_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_labels": {
+						"adapter_template_kubernetes.output.origin_labels": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING_MAP,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_namespace": {
+						"adapter_template_kubernetes.output.origin_namespace": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_service": {
+						"adapter_template_kubernetes.output.origin_service": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_service_account_name": {
+						"adapter_template_kubernetes.output.origin_service_account_name": {
 							ValueType: istio_mixer_v1_config_descriptor.STRING,
 						},
 
-						"adapter_template_kubernetesenv.output.origin_host_ip": {
+						"adapter_template_kubernetes.output.origin_host_ip": {
 							ValueType: istio_mixer_v1_config_descriptor.IP_ADDRESS,
 						},
 					},
@@ -327,20 +321,26 @@ var (
 				mapper expr.Evaluator, handler adapter.Handler) (*attribute.MutableBag, error) {
 
 				var BuildTemplate func(instName string,
-					param *adapter_template_kubernetesenv.InstanceParam, path string) (
-					*adapter_template_kubernetesenv.Instance, error)
+					param *adapter_template_kubernetes.InstanceParam, path string) (
+					*adapter_template_kubernetes.Instance, error)
 				_ = BuildTemplate
 
 				BuildTemplate = func(instName string,
-					param *adapter_template_kubernetesenv.InstanceParam, path string) (
-					*adapter_template_kubernetesenv.Instance, error) {
+					param *adapter_template_kubernetes.InstanceParam, path string) (
+					*adapter_template_kubernetes.Instance, error) {
 					if param == nil {
 						return nil, nil
 					}
 					var err error
 					_ = err
 
-					SourceUid, err := mapper.Eval(param.SourceUid, attrs)
+					var SourceUidInterface interface{}
+					var SourceUid string
+					if param.SourceUid != "" {
+						if SourceUidInterface, err = mapper.Eval(param.SourceUid, attrs); err == nil {
+							SourceUid = SourceUidInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"SourceUid", instName, err)
@@ -348,7 +348,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					SourceIp, err := mapper.Eval(param.SourceIp, attrs)
+					var SourceIpInterface interface{}
+					var SourceIp net.IP
+					if param.SourceIp != "" {
+						if SourceIpInterface, err = mapper.Eval(param.SourceIp, attrs); err == nil {
+							SourceIp = SourceIpInterface.(net.IP)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"SourceIp", instName, err)
@@ -356,7 +362,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					DestinationUid, err := mapper.Eval(param.DestinationUid, attrs)
+					var DestinationUidInterface interface{}
+					var DestinationUid string
+					if param.DestinationUid != "" {
+						if DestinationUidInterface, err = mapper.Eval(param.DestinationUid, attrs); err == nil {
+							DestinationUid = DestinationUidInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"DestinationUid", instName, err)
@@ -364,7 +376,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					DestinationIp, err := mapper.Eval(param.DestinationIp, attrs)
+					var DestinationIpInterface interface{}
+					var DestinationIp net.IP
+					if param.DestinationIp != "" {
+						if DestinationIpInterface, err = mapper.Eval(param.DestinationIp, attrs); err == nil {
+							DestinationIp = DestinationIpInterface.(net.IP)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"DestinationIp", instName, err)
@@ -372,7 +390,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					OriginUid, err := mapper.Eval(param.OriginUid, attrs)
+					var OriginUidInterface interface{}
+					var OriginUid string
+					if param.OriginUid != "" {
+						if OriginUidInterface, err = mapper.Eval(param.OriginUid, attrs); err == nil {
+							OriginUid = OriginUidInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"OriginUid", instName, err)
@@ -380,7 +404,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					OriginIp, err := mapper.Eval(param.OriginIp, attrs)
+					var OriginIpInterface interface{}
+					var OriginIp net.IP
+					if param.OriginIp != "" {
+						if OriginIpInterface, err = mapper.Eval(param.OriginIp, attrs); err == nil {
+							OriginIp = OriginIpInterface.(net.IP)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"OriginIp", instName, err)
@@ -389,37 +419,37 @@ var (
 					}
 
 					_ = param
-					return &adapter_template_kubernetesenv.Instance{
+					return &adapter_template_kubernetes.Instance{
 
 						Name: instName,
 
-						SourceUid: SourceUid.(string),
+						SourceUid: SourceUid,
 
-						SourceIp: net.IP(SourceIp.([]uint8)),
+						SourceIp: SourceIp,
 
-						DestinationUid: DestinationUid.(string),
+						DestinationUid: DestinationUid,
 
-						DestinationIp: net.IP(DestinationIp.([]uint8)),
+						DestinationIp: DestinationIp,
 
-						OriginUid: OriginUid.(string),
+						OriginUid: OriginUid,
 
-						OriginIp: net.IP(OriginIp.([]uint8)),
+						OriginIp: OriginIp,
 					}, nil
 				}
 
-				instParam := inst.(*adapter_template_kubernetesenv.InstanceParam)
+				instParam := inst.(*adapter_template_kubernetes.InstanceParam)
 				instance, err := BuildTemplate(instName, instParam, "")
 				if err != nil {
 					return nil, err
 
 				}
 
-				out, err := handler.(adapter_template_kubernetesenv.Handler).GenerateKubernetesEnvAttributes(ctx, instance)
+				out, err := handler.(adapter_template_kubernetes.Handler).GenerateKubernetesAttributes(ctx, instance)
 				if err != nil {
 					return nil, err
 				}
 				abag := attrs
-				const fullOutName = "adapter_template_kubernetesenv.output."
+				const fullOutName = "adapter_template_kubernetes.output."
 				if out == nil {
 					log.Debugf("Preprocess adapter returned nil output for instance name '%s'", instName)
 				} else {
@@ -516,7 +546,6 @@ var (
 								default:
 									return nil, false
 								}
-
 							}
 							return attrs.Get(name)
 						},
@@ -547,6 +576,204 @@ var (
 				}
 				return resultBag, nil
 
+			},
+
+			/* runtime2 bindings */
+
+			// DispathGenAttrs dispatches the instance to the attribute producing handler.
+			DispatchGenAttrs: func(ctx context.Context, handler adapter.Handler, inst interface{}, attrs attribute.Bag,
+				mapper template.OutputMapperFn) (*attribute.MutableBag, error) {
+
+				// Convert the instance from the generic interface{}, to their specialized type.
+				instance := inst.(*adapter_template_kubernetes.Instance)
+
+				// Invoke the handler.
+				out, err := handler.(adapter_template_kubernetes.Handler).GenerateKubernetesAttributes(ctx, instance)
+				if err != nil {
+					return nil, err
+				}
+
+				// Construct a wrapper bag around the returned output message and pass it to the output mapper
+				// to map $out values back to the destination attributes in the ambient context.
+				const fullOutName = "adapter_template_kubernetes.output."
+				outBag := newWrapperAttrBag(
+					func(name string) (value interface{}, found bool) {
+						field := strings.TrimPrefix(name, fullOutName)
+						if len(field) != len(name) {
+							switch field {
+
+							case "source_pod_ip":
+
+								return []uint8(out.SourcePodIp), true
+
+							case "source_pod_name":
+
+								return out.SourcePodName, true
+
+							case "source_labels":
+
+								return out.SourceLabels, true
+
+							case "source_namespace":
+
+								return out.SourceNamespace, true
+
+							case "source_service":
+
+								return out.SourceService, true
+
+							case "source_service_account_name":
+
+								return out.SourceServiceAccountName, true
+
+							case "source_host_ip":
+
+								return []uint8(out.SourceHostIp), true
+
+							case "destination_pod_ip":
+
+								return []uint8(out.DestinationPodIp), true
+
+							case "destination_pod_name":
+
+								return out.DestinationPodName, true
+
+							case "destination_labels":
+
+								return out.DestinationLabels, true
+
+							case "destination_namespace":
+
+								return out.DestinationNamespace, true
+
+							case "destination_service":
+
+								return out.DestinationService, true
+
+							case "destination_service_account_name":
+
+								return out.DestinationServiceAccountName, true
+
+							case "destination_host_ip":
+
+								return []uint8(out.DestinationHostIp), true
+
+							case "origin_pod_ip":
+
+								return []uint8(out.OriginPodIp), true
+
+							case "origin_pod_name":
+
+								return out.OriginPodName, true
+
+							case "origin_labels":
+
+								return out.OriginLabels, true
+
+							case "origin_namespace":
+
+								return out.OriginNamespace, true
+
+							case "origin_service":
+
+								return out.OriginService, true
+
+							case "origin_service_account_name":
+
+								return out.OriginServiceAccountName, true
+
+							case "origin_host_ip":
+
+								return []uint8(out.OriginHostIp), true
+
+							default:
+								return nil, false
+							}
+						}
+						return attrs.Get(name)
+					},
+					func() []string { return attrs.Names() },
+					func() { attrs.Done() },
+					func() string { return attrs.DebugString() },
+				)
+
+				// Mapper will map back $out values in the outBag into ambient attribute names, and return
+				// a bag with these additional attributes.
+				return mapper(outBag)
+			},
+
+			// CreateInstanceBuilder creates a new template.InstanceBuilderFN based on the supplied instance parameters. It uses
+			// the expression builder to create a new instance of a builder struct for the instance type. Created
+			// InstanceBuilderFn closes over this struct. When InstanceBuilderFn is called it, in turn, calls into
+			// the builder with an attribute bag.
+			//
+			// See template.CreateInstanceBuilderFn for more details.
+			CreateInstanceBuilder: func(instanceName string, param proto.Message, expb *compiled.ExpressionBuilder) (template.InstanceBuilderFn, error) {
+
+				// If the parameter is nil. Simply return nil. The builder, then, will also return nil.
+				if param == nil {
+					return func(attr attribute.Bag) (interface{}, error) {
+						return nil, nil
+					}, nil
+				}
+
+				// Instantiate a new builder for the instance.
+				builder, errp := newBuilder_adapter_template_kubernetes_Template(expb, param.(*adapter_template_kubernetes.InstanceParam))
+				if !errp.IsNil() {
+					return nil, errp.AsCompilationError(instanceName)
+				}
+
+				return func(attr attribute.Bag) (interface{}, error) {
+					// Use the instantiated builder (that this fn closes over) to construct an instance.
+					e, errp := builder.build(attr)
+					if !errp.IsNil() {
+						err := errp.AsEvaluationError(instanceName)
+						log.Error(err.Error())
+						return nil, err
+					}
+
+					e.Name = instanceName
+					return e, nil
+				}, nil
+			},
+
+			// CreateOutputExpressions creates a set of compiled expressions based on the supplied instance parameters.
+			//
+			// See template.CreateOutputExpressionsFn for more details.
+			CreateOutputExpressions: func(
+				instanceParam proto.Message,
+				finder expr.AttributeDescriptorFinder,
+				expb *compiled.ExpressionBuilder) (map[string]compiled.Expression, error) {
+				var err error
+				var expType istio_mixer_v1_config_descriptor.ValueType
+
+				// Convert the generic instanceParam to its specialized type.
+				param := instanceParam.(*adapter_template_kubernetes.InstanceParam)
+
+				// Create a mapping of expressions back to the attribute names.
+				expressions := make(map[string]compiled.Expression, len(param.AttributeBindings))
+
+				const fullOutName = "adapter_template_kubernetes.output."
+				for attrName, outExpr := range param.AttributeBindings {
+					attrInfo := finder.GetAttribute(attrName)
+					if attrInfo == nil {
+						log.Warnf("attribute not found when mapping outputs: attr='%s', expr='%s'", attrName, outExpr)
+						continue
+					}
+
+					ex := strings.Replace(outExpr, "$out.", fullOutName, -1)
+
+					if expressions[attrName], expType, err = expb.Compile(ex); err != nil {
+						return nil, err
+					}
+
+					if attrInfo.ValueType != expType {
+						log.Warnf("attribute type mismatch: attr='%s', attrType='%v', expr='%s', exprType='%v'", attrName, attrInfo.ValueType, outExpr, expType)
+						continue
+					}
+				}
+
+				return expressions, nil
 			},
 		},
 
@@ -583,134 +810,121 @@ var (
 
 					var err error = nil
 
-					if param.ApiVersion == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiVersion")
-					}
-					if t, e := tEvalFn(param.ApiVersion); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiVersion", e)
+					if param.ApiVersion != "" {
+						if t, e := tEvalFn(param.ApiVersion); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiVersion", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiVersion", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiVersion", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiOperation == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiOperation")
-					}
-					if t, e := tEvalFn(param.ApiOperation); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiOperation", e)
+					if param.ApiOperation != "" {
+						if t, e := tEvalFn(param.ApiOperation); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiOperation", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiOperation", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiOperation", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiProtocol == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiProtocol")
-					}
-					if t, e := tEvalFn(param.ApiProtocol); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiProtocol", e)
+					if param.ApiProtocol != "" {
+						if t, e := tEvalFn(param.ApiProtocol); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiProtocol", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiProtocol", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiProtocol", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiService == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiService")
-					}
-					if t, e := tEvalFn(param.ApiService); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiService", e)
+					if param.ApiService != "" {
+						if t, e := tEvalFn(param.ApiService); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiService", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiService", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiService", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiKey == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiKey")
-					}
-					if t, e := tEvalFn(param.ApiKey); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiKey", e)
+					if param.ApiKey != "" {
+						if t, e := tEvalFn(param.ApiKey); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiKey", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiKey", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiKey", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.RequestTime == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"RequestTime")
-					}
-					if t, e := tEvalFn(param.RequestTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestTime", e)
+					if param.RequestTime != "" {
+						if t, e := tEvalFn(param.RequestTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestTime", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
-					if param.RequestMethod == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"RequestMethod")
-					}
-					if t, e := tEvalFn(param.RequestMethod); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestMethod", e)
+					if param.RequestMethod != "" {
+						if t, e := tEvalFn(param.RequestMethod); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestMethod", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestMethod", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestMethod", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.RequestPath == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"RequestPath")
-					}
-					if t, e := tEvalFn(param.RequestPath); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestPath", e)
+					if param.RequestPath != "" {
+						if t, e := tEvalFn(param.RequestPath); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestPath", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestPath", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestPath", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.RequestBytes == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"RequestBytes")
-					}
-					if t, e := tEvalFn(param.RequestBytes); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestBytes", e)
+					if param.RequestBytes != "" {
+						if t, e := tEvalFn(param.RequestBytes); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"RequestBytes", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestBytes", t, istio_mixer_v1_config_descriptor.INT64)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"RequestBytes", t, istio_mixer_v1_config_descriptor.INT64)
 					}
 
-					if param.ResponseTime == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ResponseTime")
-					}
-					if t, e := tEvalFn(param.ResponseTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseTime", e)
+					if param.ResponseTime != "" {
+						if t, e := tEvalFn(param.ResponseTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseTime", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
-					if param.ResponseCode == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ResponseCode")
-					}
-					if t, e := tEvalFn(param.ResponseCode); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseCode", e)
+					if param.ResponseCode != "" {
+						if t, e := tEvalFn(param.ResponseCode); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseCode", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseCode", t, istio_mixer_v1_config_descriptor.INT64)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseCode", t, istio_mixer_v1_config_descriptor.INT64)
 					}
 
-					if param.ResponseBytes == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ResponseBytes")
-					}
-					if t, e := tEvalFn(param.ResponseBytes); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseBytes", e)
+					if param.ResponseBytes != "" {
+						if t, e := tEvalFn(param.ResponseBytes); e != nil || t != istio_mixer_v1_config_descriptor.INT64 {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseBytes", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseBytes", t, istio_mixer_v1_config_descriptor.INT64)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseBytes", t, istio_mixer_v1_config_descriptor.INT64)
 					}
 
-					if param.ResponseLatency == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ResponseLatency")
-					}
-					if t, e := tEvalFn(param.ResponseLatency); e != nil || t != istio_mixer_v1_config_descriptor.DURATION {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseLatency", e)
+					if param.ResponseLatency != "" {
+						if t, e := tEvalFn(param.ResponseLatency); e != nil || t != istio_mixer_v1_config_descriptor.DURATION {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ResponseLatency", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseLatency", t, istio_mixer_v1_config_descriptor.DURATION)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ResponseLatency", t, istio_mixer_v1_config_descriptor.DURATION)
 					}
 
 					return infrdType, err
@@ -750,7 +964,13 @@ var (
 					var err error
 					_ = err
 
-					ApiVersion, err := mapper.Eval(param.ApiVersion, attrs)
+					var ApiVersionInterface interface{}
+					var ApiVersion string
+					if param.ApiVersion != "" {
+						if ApiVersionInterface, err = mapper.Eval(param.ApiVersion, attrs); err == nil {
+							ApiVersion = ApiVersionInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiVersion", instName, err)
@@ -758,7 +978,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiOperation, err := mapper.Eval(param.ApiOperation, attrs)
+					var ApiOperationInterface interface{}
+					var ApiOperation string
+					if param.ApiOperation != "" {
+						if ApiOperationInterface, err = mapper.Eval(param.ApiOperation, attrs); err == nil {
+							ApiOperation = ApiOperationInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiOperation", instName, err)
@@ -766,7 +992,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiProtocol, err := mapper.Eval(param.ApiProtocol, attrs)
+					var ApiProtocolInterface interface{}
+					var ApiProtocol string
+					if param.ApiProtocol != "" {
+						if ApiProtocolInterface, err = mapper.Eval(param.ApiProtocol, attrs); err == nil {
+							ApiProtocol = ApiProtocolInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiProtocol", instName, err)
@@ -774,7 +1006,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiService, err := mapper.Eval(param.ApiService, attrs)
+					var ApiServiceInterface interface{}
+					var ApiService string
+					if param.ApiService != "" {
+						if ApiServiceInterface, err = mapper.Eval(param.ApiService, attrs); err == nil {
+							ApiService = ApiServiceInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiService", instName, err)
@@ -782,7 +1020,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiKey, err := mapper.Eval(param.ApiKey, attrs)
+					var ApiKeyInterface interface{}
+					var ApiKey string
+					if param.ApiKey != "" {
+						if ApiKeyInterface, err = mapper.Eval(param.ApiKey, attrs); err == nil {
+							ApiKey = ApiKeyInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiKey", instName, err)
@@ -790,7 +1034,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					RequestTime, err := mapper.Eval(param.RequestTime, attrs)
+					var RequestTimeInterface interface{}
+					var RequestTime time.Time
+					if param.RequestTime != "" {
+						if RequestTimeInterface, err = mapper.Eval(param.RequestTime, attrs); err == nil {
+							RequestTime = RequestTimeInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"RequestTime", instName, err)
@@ -798,7 +1048,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					RequestMethod, err := mapper.Eval(param.RequestMethod, attrs)
+					var RequestMethodInterface interface{}
+					var RequestMethod string
+					if param.RequestMethod != "" {
+						if RequestMethodInterface, err = mapper.Eval(param.RequestMethod, attrs); err == nil {
+							RequestMethod = RequestMethodInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"RequestMethod", instName, err)
@@ -806,7 +1062,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					RequestPath, err := mapper.Eval(param.RequestPath, attrs)
+					var RequestPathInterface interface{}
+					var RequestPath string
+					if param.RequestPath != "" {
+						if RequestPathInterface, err = mapper.Eval(param.RequestPath, attrs); err == nil {
+							RequestPath = RequestPathInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"RequestPath", instName, err)
@@ -814,7 +1076,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					RequestBytes, err := mapper.Eval(param.RequestBytes, attrs)
+					var RequestBytesInterface interface{}
+					var RequestBytes int64
+					if param.RequestBytes != "" {
+						if RequestBytesInterface, err = mapper.Eval(param.RequestBytes, attrs); err == nil {
+							RequestBytes = RequestBytesInterface.(int64)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"RequestBytes", instName, err)
@@ -822,7 +1090,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ResponseTime, err := mapper.Eval(param.ResponseTime, attrs)
+					var ResponseTimeInterface interface{}
+					var ResponseTime time.Time
+					if param.ResponseTime != "" {
+						if ResponseTimeInterface, err = mapper.Eval(param.ResponseTime, attrs); err == nil {
+							ResponseTime = ResponseTimeInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ResponseTime", instName, err)
@@ -830,7 +1104,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ResponseCode, err := mapper.Eval(param.ResponseCode, attrs)
+					var ResponseCodeInterface interface{}
+					var ResponseCode int64
+					if param.ResponseCode != "" {
+						if ResponseCodeInterface, err = mapper.Eval(param.ResponseCode, attrs); err == nil {
+							ResponseCode = ResponseCodeInterface.(int64)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ResponseCode", instName, err)
@@ -838,7 +1118,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ResponseBytes, err := mapper.Eval(param.ResponseBytes, attrs)
+					var ResponseBytesInterface interface{}
+					var ResponseBytes int64
+					if param.ResponseBytes != "" {
+						if ResponseBytesInterface, err = mapper.Eval(param.ResponseBytes, attrs); err == nil {
+							ResponseBytes = ResponseBytesInterface.(int64)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ResponseBytes", instName, err)
@@ -846,7 +1132,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ResponseLatency, err := mapper.Eval(param.ResponseLatency, attrs)
+					var ResponseLatencyInterface interface{}
+					var ResponseLatency time.Duration
+					if param.ResponseLatency != "" {
+						if ResponseLatencyInterface, err = mapper.Eval(param.ResponseLatency, attrs); err == nil {
+							ResponseLatency = ResponseLatencyInterface.(time.Duration)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ResponseLatency", instName, err)
@@ -859,31 +1151,31 @@ var (
 
 						Name: instName,
 
-						ApiVersion: ApiVersion.(string),
+						ApiVersion: ApiVersion,
 
-						ApiOperation: ApiOperation.(string),
+						ApiOperation: ApiOperation,
 
-						ApiProtocol: ApiProtocol.(string),
+						ApiProtocol: ApiProtocol,
 
-						ApiService: ApiService.(string),
+						ApiService: ApiService,
 
-						ApiKey: ApiKey.(string),
+						ApiKey: ApiKey,
 
-						RequestTime: RequestTime.(time.Time),
+						RequestTime: RequestTime,
 
-						RequestMethod: RequestMethod.(string),
+						RequestMethod: RequestMethod,
 
-						RequestPath: RequestPath.(string),
+						RequestPath: RequestPath,
 
-						RequestBytes: RequestBytes.(int64),
+						RequestBytes: RequestBytes,
 
-						ResponseTime: ResponseTime.(time.Time),
+						ResponseTime: ResponseTime,
 
-						ResponseCode: ResponseCode.(int64),
+						ResponseCode: ResponseCode,
 
-						ResponseBytes: ResponseBytes.(int64),
+						ResponseBytes: ResponseBytes,
 
-						ResponseLatency: ResponseLatency.(time.Duration),
+						ResponseLatency: ResponseLatency,
 					}, nil
 				}
 
@@ -989,54 +1281,49 @@ var (
 
 					var err error = nil
 
-					if param.Api == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Api")
-					}
-					if t, e := tEvalFn(param.Api); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Api", e)
+					if param.Api != "" {
+						if t, e := tEvalFn(param.Api); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Api", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Api", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Api", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiVersion == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiVersion")
-					}
-					if t, e := tEvalFn(param.ApiVersion); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiVersion", e)
+					if param.ApiVersion != "" {
+						if t, e := tEvalFn(param.ApiVersion); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiVersion", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiVersion", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiVersion", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiOperation == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiOperation")
-					}
-					if t, e := tEvalFn(param.ApiOperation); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiOperation", e)
+					if param.ApiOperation != "" {
+						if t, e := tEvalFn(param.ApiOperation); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiOperation", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiOperation", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiOperation", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ApiKey == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ApiKey")
-					}
-					if t, e := tEvalFn(param.ApiKey); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiKey", e)
+					if param.ApiKey != "" {
+						if t, e := tEvalFn(param.ApiKey); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ApiKey", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiKey", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ApiKey", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.Timestamp == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Timestamp")
-					}
-					if t, e := tEvalFn(param.Timestamp); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Timestamp", e)
+					if param.Timestamp != "" {
+						if t, e := tEvalFn(param.Timestamp); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Timestamp", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Timestamp", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Timestamp", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
 					return infrdType, err
@@ -1077,7 +1364,13 @@ var (
 					var err error
 					_ = err
 
-					Api, err := mapper.Eval(param.Api, attrs)
+					var ApiInterface interface{}
+					var Api string
+					if param.Api != "" {
+						if ApiInterface, err = mapper.Eval(param.Api, attrs); err == nil {
+							Api = ApiInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Api", instName, err)
@@ -1085,7 +1378,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiVersion, err := mapper.Eval(param.ApiVersion, attrs)
+					var ApiVersionInterface interface{}
+					var ApiVersion string
+					if param.ApiVersion != "" {
+						if ApiVersionInterface, err = mapper.Eval(param.ApiVersion, attrs); err == nil {
+							ApiVersion = ApiVersionInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiVersion", instName, err)
@@ -1093,7 +1392,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiOperation, err := mapper.Eval(param.ApiOperation, attrs)
+					var ApiOperationInterface interface{}
+					var ApiOperation string
+					if param.ApiOperation != "" {
+						if ApiOperationInterface, err = mapper.Eval(param.ApiOperation, attrs); err == nil {
+							ApiOperation = ApiOperationInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiOperation", instName, err)
@@ -1101,7 +1406,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ApiKey, err := mapper.Eval(param.ApiKey, attrs)
+					var ApiKeyInterface interface{}
+					var ApiKey string
+					if param.ApiKey != "" {
+						if ApiKeyInterface, err = mapper.Eval(param.ApiKey, attrs); err == nil {
+							ApiKey = ApiKeyInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ApiKey", instName, err)
@@ -1109,7 +1420,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Timestamp, err := mapper.Eval(param.Timestamp, attrs)
+					var TimestampInterface interface{}
+					var Timestamp time.Time
+					if param.Timestamp != "" {
+						if TimestampInterface, err = mapper.Eval(param.Timestamp, attrs); err == nil {
+							Timestamp = TimestampInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Timestamp", instName, err)
@@ -1122,15 +1439,15 @@ var (
 
 						Name: instName,
 
-						Api: Api.(string),
+						Api: Api,
 
-						ApiVersion: ApiVersion.(string),
+						ApiVersion: ApiVersion,
 
-						ApiOperation: ApiOperation.(string),
+						ApiOperation: ApiOperation,
 
-						ApiKey: ApiKey.(string),
+						ApiKey: ApiKey,
 
-						Timestamp: Timestamp.(time.Time),
+						Timestamp: Timestamp,
 					}, nil
 				}
 
@@ -1265,24 +1582,22 @@ var (
 
 					var err error = nil
 
-					if param.User == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"User")
-					}
-					if t, e := tEvalFn(param.User); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"User", e)
+					if param.User != "" {
+						if t, e := tEvalFn(param.User); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"User", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"User", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"User", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.Groups == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Groups")
-					}
-					if t, e := tEvalFn(param.Groups); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Groups", e)
+					if param.Groups != "" {
+						if t, e := tEvalFn(param.Groups); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Groups", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Groups", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Groups", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
 					infrdType.Properties = make(map[string]istio_mixer_v1_config_descriptor.ValueType, len(param.Properties))
@@ -1291,7 +1606,7 @@ var (
 
 						if infrdType.Properties[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Properties", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "Properties", k, err)
 						}
 					}
 
@@ -1310,44 +1625,40 @@ var (
 
 					var err error = nil
 
-					if param.Namespace == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Namespace")
-					}
-					if t, e := tEvalFn(param.Namespace); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Namespace", e)
+					if param.Namespace != "" {
+						if t, e := tEvalFn(param.Namespace); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Namespace", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Namespace", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Namespace", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.Service == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Service")
-					}
-					if t, e := tEvalFn(param.Service); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Service", e)
+					if param.Service != "" {
+						if t, e := tEvalFn(param.Service); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Service", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Service", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Service", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.Method == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Method")
-					}
-					if t, e := tEvalFn(param.Method); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Method", e)
+					if param.Method != "" {
+						if t, e := tEvalFn(param.Method); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Method", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Method", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Method", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.Path == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Path")
-					}
-					if t, e := tEvalFn(param.Path); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Path", e)
+					if param.Path != "" {
+						if t, e := tEvalFn(param.Path); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Path", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Path", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Path", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
 					infrdType.Properties = make(map[string]istio_mixer_v1_config_descriptor.ValueType, len(param.Properties))
@@ -1356,7 +1667,7 @@ var (
 
 						if infrdType.Properties[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Properties", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "Properties", k, err)
 						}
 					}
 
@@ -1444,7 +1755,13 @@ var (
 					var err error
 					_ = err
 
-					User, err := mapper.Eval(param.User, attrs)
+					var UserInterface interface{}
+					var User string
+					if param.User != "" {
+						if UserInterface, err = mapper.Eval(param.User, attrs); err == nil {
+							User = UserInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"User", instName, err)
@@ -1452,7 +1769,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Groups, err := mapper.Eval(param.Groups, attrs)
+					var GroupsInterface interface{}
+					var Groups string
+					if param.Groups != "" {
+						if GroupsInterface, err = mapper.Eval(param.Groups, attrs); err == nil {
+							Groups = GroupsInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Groups", instName, err)
@@ -1471,9 +1794,9 @@ var (
 					_ = param
 					return &authorization.Subject{
 
-						User: User.(string),
+						User: User,
 
-						Groups: Groups.(string),
+						Groups: Groups,
 
 						Properties: Properties,
 					}, nil
@@ -1488,7 +1811,13 @@ var (
 					var err error
 					_ = err
 
-					Namespace, err := mapper.Eval(param.Namespace, attrs)
+					var NamespaceInterface interface{}
+					var Namespace string
+					if param.Namespace != "" {
+						if NamespaceInterface, err = mapper.Eval(param.Namespace, attrs); err == nil {
+							Namespace = NamespaceInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Namespace", instName, err)
@@ -1496,7 +1825,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Service, err := mapper.Eval(param.Service, attrs)
+					var ServiceInterface interface{}
+					var Service string
+					if param.Service != "" {
+						if ServiceInterface, err = mapper.Eval(param.Service, attrs); err == nil {
+							Service = ServiceInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Service", instName, err)
@@ -1504,7 +1839,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Method, err := mapper.Eval(param.Method, attrs)
+					var MethodInterface interface{}
+					var Method string
+					if param.Method != "" {
+						if MethodInterface, err = mapper.Eval(param.Method, attrs); err == nil {
+							Method = MethodInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Method", instName, err)
@@ -1512,7 +1853,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Path, err := mapper.Eval(param.Path, attrs)
+					var PathInterface interface{}
+					var Path string
+					if param.Path != "" {
+						if PathInterface, err = mapper.Eval(param.Path, attrs); err == nil {
+							Path = PathInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Path", instName, err)
@@ -1531,13 +1878,13 @@ var (
 					_ = param
 					return &authorization.Action{
 
-						Namespace: Namespace.(string),
+						Namespace: Namespace,
 
-						Service: Service.(string),
+						Service: Service,
 
-						Method: Method.(string),
+						Method: Method,
 
-						Path: Path.(string),
+						Path: Path,
 
 						Properties: Properties,
 					}, nil
@@ -1772,14 +2119,13 @@ var (
 
 					var err error = nil
 
-					if param.Value == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Value")
-					}
-					if t, e := tEvalFn(param.Value); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Value", e)
+					if param.Value != "" {
+						if t, e := tEvalFn(param.Value); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Value", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Value", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Value", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
 					return infrdType, err
@@ -1820,7 +2166,13 @@ var (
 					var err error
 					_ = err
 
-					Value, err := mapper.Eval(param.Value, attrs)
+					var ValueInterface interface{}
+					var Value string
+					if param.Value != "" {
+						if ValueInterface, err = mapper.Eval(param.Value, attrs); err == nil {
+							Value = ValueInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Value", instName, err)
@@ -1833,7 +2185,7 @@ var (
 
 						Name: instName,
 
-						Value: Value.(string),
+						Value: Value,
 					}, nil
 				}
 
@@ -1935,38 +2287,35 @@ var (
 
 						if infrdType.Variables[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Variables", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "Variables", k, err)
 						}
 					}
 
-					if param.Timestamp == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Timestamp")
-					}
-					if t, e := tEvalFn(param.Timestamp); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Timestamp", e)
+					if param.Timestamp != "" {
+						if t, e := tEvalFn(param.Timestamp); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Timestamp", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Timestamp", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Timestamp", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
-					if param.Severity == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Severity")
-					}
-					if t, e := tEvalFn(param.Severity); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Severity", e)
+					if param.Severity != "" {
+						if t, e := tEvalFn(param.Severity); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"Severity", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Severity", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"Severity", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.MonitoredResourceType == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"MonitoredResourceType")
-					}
-					if t, e := tEvalFn(param.MonitoredResourceType); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"MonitoredResourceType", e)
+					if param.MonitoredResourceType != "" {
+						if t, e := tEvalFn(param.MonitoredResourceType); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"MonitoredResourceType", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"MonitoredResourceType", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"MonitoredResourceType", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
 					infrdType.MonitoredResourceDimensions = make(map[string]istio_mixer_v1_config_descriptor.ValueType, len(param.MonitoredResourceDimensions))
@@ -1975,7 +2324,7 @@ var (
 
 						if infrdType.MonitoredResourceDimensions[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"MonitoredResourceDimensions", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "MonitoredResourceDimensions", k, err)
 						}
 					}
 
@@ -2024,7 +2373,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Timestamp, err := mapper.Eval(param.Timestamp, attrs)
+					var TimestampInterface interface{}
+					var Timestamp time.Time
+					if param.Timestamp != "" {
+						if TimestampInterface, err = mapper.Eval(param.Timestamp, attrs); err == nil {
+							Timestamp = TimestampInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Timestamp", instName, err)
@@ -2032,7 +2387,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					Severity, err := mapper.Eval(param.Severity, attrs)
+					var SeverityInterface interface{}
+					var Severity string
+					if param.Severity != "" {
+						if SeverityInterface, err = mapper.Eval(param.Severity, attrs); err == nil {
+							Severity = SeverityInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Severity", instName, err)
@@ -2040,7 +2401,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					MonitoredResourceType, err := mapper.Eval(param.MonitoredResourceType, attrs)
+					var MonitoredResourceTypeInterface interface{}
+					var MonitoredResourceType string
+					if param.MonitoredResourceType != "" {
+						if MonitoredResourceTypeInterface, err = mapper.Eval(param.MonitoredResourceType, attrs); err == nil {
+							MonitoredResourceType = MonitoredResourceTypeInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"MonitoredResourceType", instName, err)
@@ -2063,11 +2430,11 @@ var (
 
 						Variables: Variables,
 
-						Timestamp: Timestamp.(time.Time),
+						Timestamp: Timestamp,
 
-						Severity: Severity.(string),
+						Severity: Severity,
 
-						MonitoredResourceType: MonitoredResourceType.(string),
+						MonitoredResourceType: MonitoredResourceType,
 
 						MonitoredResourceDimensions: MonitoredResourceDimensions,
 					}, nil
@@ -2176,9 +2543,8 @@ var (
 					var err error = nil
 
 					if param.Value == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"Value")
-					}
-					if infrdType.Value, err = tEvalFn(param.Value); err != nil {
+						infrdType.Value = istio_mixer_v1_config_descriptor.VALUE_TYPE_UNSPECIFIED
+					} else if infrdType.Value, err = tEvalFn(param.Value); err != nil {
 						return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Value", err)
 					}
 
@@ -2188,18 +2554,17 @@ var (
 
 						if infrdType.Dimensions[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Dimensions", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "Dimensions", k, err)
 						}
 					}
 
-					if param.MonitoredResourceType == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"MonitoredResourceType")
-					}
-					if t, e := tEvalFn(param.MonitoredResourceType); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"MonitoredResourceType", e)
+					if param.MonitoredResourceType != "" {
+						if t, e := tEvalFn(param.MonitoredResourceType); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"MonitoredResourceType", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"MonitoredResourceType", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"MonitoredResourceType", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
 					infrdType.MonitoredResourceDimensions = make(map[string]istio_mixer_v1_config_descriptor.ValueType, len(param.MonitoredResourceDimensions))
@@ -2208,7 +2573,7 @@ var (
 
 						if infrdType.MonitoredResourceDimensions[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"MonitoredResourceDimensions", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "MonitoredResourceDimensions", k, err)
 						}
 					}
 
@@ -2249,7 +2614,10 @@ var (
 					var err error
 					_ = err
 
-					Value, err := mapper.Eval(param.Value, attrs)
+					var Value interface{}
+					if param.Value != "" {
+						Value, err = mapper.Eval(param.Value, attrs)
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"Value", instName, err)
@@ -2265,7 +2633,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					MonitoredResourceType, err := mapper.Eval(param.MonitoredResourceType, attrs)
+					var MonitoredResourceTypeInterface interface{}
+					var MonitoredResourceType string
+					if param.MonitoredResourceType != "" {
+						if MonitoredResourceTypeInterface, err = mapper.Eval(param.MonitoredResourceType, attrs); err == nil {
+							MonitoredResourceType = MonitoredResourceTypeInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"MonitoredResourceType", instName, err)
@@ -2290,7 +2664,7 @@ var (
 
 						Dimensions: Dimensions,
 
-						MonitoredResourceType: MonitoredResourceType.(string),
+						MonitoredResourceType: MonitoredResourceType,
 
 						MonitoredResourceDimensions: MonitoredResourceDimensions,
 					}, nil
@@ -2404,7 +2778,7 @@ var (
 
 						if infrdType.Dimensions[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"Dimensions", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "Dimensions", k, err)
 						}
 					}
 
@@ -2700,64 +3074,58 @@ var (
 
 					var err error = nil
 
-					if param.TraceId == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"TraceId")
-					}
-					if t, e := tEvalFn(param.TraceId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"TraceId", e)
+					if param.TraceId != "" {
+						if t, e := tEvalFn(param.TraceId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"TraceId", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"TraceId", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"TraceId", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.SpanId == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"SpanId")
-					}
-					if t, e := tEvalFn(param.SpanId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SpanId", e)
+					if param.SpanId != "" {
+						if t, e := tEvalFn(param.SpanId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SpanId", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SpanId", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SpanId", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.ParentSpanId == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"ParentSpanId")
-					}
-					if t, e := tEvalFn(param.ParentSpanId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ParentSpanId", e)
+					if param.ParentSpanId != "" {
+						if t, e := tEvalFn(param.ParentSpanId); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"ParentSpanId", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ParentSpanId", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"ParentSpanId", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.SpanName == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"SpanName")
-					}
-					if t, e := tEvalFn(param.SpanName); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SpanName", e)
+					if param.SpanName != "" {
+						if t, e := tEvalFn(param.SpanName); e != nil || t != istio_mixer_v1_config_descriptor.STRING {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"SpanName", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SpanName", t, istio_mixer_v1_config_descriptor.STRING)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"SpanName", t, istio_mixer_v1_config_descriptor.STRING)
 					}
 
-					if param.StartTime == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"StartTime")
-					}
-					if t, e := tEvalFn(param.StartTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"StartTime", e)
+					if param.StartTime != "" {
+						if t, e := tEvalFn(param.StartTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"StartTime", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"StartTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"StartTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
-					if param.EndTime == "" {
-						return nil, fmt.Errorf("expression for field '%s' cannot be empty", path+"EndTime")
-					}
-					if t, e := tEvalFn(param.EndTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
-						if e != nil {
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"EndTime", e)
+					if param.EndTime != "" {
+						if t, e := tEvalFn(param.EndTime); e != nil || t != istio_mixer_v1_config_descriptor.TIMESTAMP {
+							if e != nil {
+								return nil, fmt.Errorf("failed to evaluate expression for field '%s': %v", path+"EndTime", e)
+							}
+							return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"EndTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 						}
-						return nil, fmt.Errorf("error type checking for field '%s': Evaluated expression type %v want %v", path+"EndTime", t, istio_mixer_v1_config_descriptor.TIMESTAMP)
 					}
 
 					infrdType.SpanTags = make(map[string]istio_mixer_v1_config_descriptor.ValueType, len(param.SpanTags))
@@ -2766,7 +3134,7 @@ var (
 
 						if infrdType.SpanTags[k], err = tEvalFn(v); err != nil {
 
-							return nil, fmt.Errorf("failed to evaluate expression for field '%s'; %v", path+"SpanTags", err)
+							return nil, fmt.Errorf("failed to evaluate expression for field '%s%s[%s]'; %v", path, "SpanTags", k, err)
 						}
 					}
 
@@ -2807,7 +3175,13 @@ var (
 					var err error
 					_ = err
 
-					TraceId, err := mapper.Eval(param.TraceId, attrs)
+					var TraceIdInterface interface{}
+					var TraceId string
+					if param.TraceId != "" {
+						if TraceIdInterface, err = mapper.Eval(param.TraceId, attrs); err == nil {
+							TraceId = TraceIdInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"TraceId", instName, err)
@@ -2815,7 +3189,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					SpanId, err := mapper.Eval(param.SpanId, attrs)
+					var SpanIdInterface interface{}
+					var SpanId string
+					if param.SpanId != "" {
+						if SpanIdInterface, err = mapper.Eval(param.SpanId, attrs); err == nil {
+							SpanId = SpanIdInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"SpanId", instName, err)
@@ -2823,7 +3203,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					ParentSpanId, err := mapper.Eval(param.ParentSpanId, attrs)
+					var ParentSpanIdInterface interface{}
+					var ParentSpanId string
+					if param.ParentSpanId != "" {
+						if ParentSpanIdInterface, err = mapper.Eval(param.ParentSpanId, attrs); err == nil {
+							ParentSpanId = ParentSpanIdInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"ParentSpanId", instName, err)
@@ -2831,7 +3217,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					SpanName, err := mapper.Eval(param.SpanName, attrs)
+					var SpanNameInterface interface{}
+					var SpanName string
+					if param.SpanName != "" {
+						if SpanNameInterface, err = mapper.Eval(param.SpanName, attrs); err == nil {
+							SpanName = SpanNameInterface.(string)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"SpanName", instName, err)
@@ -2839,7 +3231,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					StartTime, err := mapper.Eval(param.StartTime, attrs)
+					var StartTimeInterface interface{}
+					var StartTime time.Time
+					if param.StartTime != "" {
+						if StartTimeInterface, err = mapper.Eval(param.StartTime, attrs); err == nil {
+							StartTime = StartTimeInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"StartTime", instName, err)
@@ -2847,7 +3245,13 @@ var (
 						return nil, errors.New(msg)
 					}
 
-					EndTime, err := mapper.Eval(param.EndTime, attrs)
+					var EndTimeInterface interface{}
+					var EndTime time.Time
+					if param.EndTime != "" {
+						if EndTimeInterface, err = mapper.Eval(param.EndTime, attrs); err == nil {
+							EndTime = EndTimeInterface.(time.Time)
+						}
+					}
 
 					if err != nil {
 						msg := fmt.Sprintf("failed to evaluate field '%s' for instance '%s': %v", path+"EndTime", instName, err)
@@ -2868,17 +3272,17 @@ var (
 
 						Name: instName,
 
-						TraceId: TraceId.(string),
+						TraceId: TraceId,
 
-						SpanId: SpanId.(string),
+						SpanId: SpanId,
 
-						ParentSpanId: ParentSpanId.(string),
+						ParentSpanId: ParentSpanId,
 
-						SpanName: SpanName.(string),
+						SpanName: SpanName,
 
-						StartTime: StartTime.(time.Time),
+						StartTime: StartTime,
 
-						EndTime: EndTime.(time.Time),
+						EndTime: EndTime,
 
 						SpanTags: SpanTags,
 					}, nil
@@ -2958,6 +3362,221 @@ var (
 // Builders for all known message types.
 
 // builder struct for constructing an instance of Template.
+type builder_adapter_template_kubernetes_Template struct {
+
+	// builder for field source_uid: string.
+
+	bldSourceUid compiled.Expression
+
+	// builder for field source_ip: net.IP.
+
+	bldSourceIp compiled.Expression
+
+	// builder for field destination_uid: string.
+
+	bldDestinationUid compiled.Expression
+
+	// builder for field destination_ip: net.IP.
+
+	bldDestinationIp compiled.Expression
+
+	// builder for field origin_uid: string.
+
+	bldOriginUid compiled.Expression
+
+	// builder for field origin_ip: net.IP.
+
+	bldOriginIp compiled.Expression
+} // builder_adapter_template_kubernetes_Template
+
+// Instantiates and returns a new builder for Template, based on the provided instance parameter.
+func newBuilder_adapter_template_kubernetes_Template(
+	expb *compiled.ExpressionBuilder,
+	param *adapter_template_kubernetes.InstanceParam) (*builder_adapter_template_kubernetes_Template, template.ErrorPath) {
+
+	// If the parameter is nil. Simply return nil. The builder, then, will also return nil.
+	if param == nil {
+		return nil, template.ErrorPath{}
+	}
+
+	b := &builder_adapter_template_kubernetes_Template{}
+
+	var exp compiled.Expression
+	_ = exp
+	var err error
+	_ = err
+	var errp template.ErrorPath
+	_ = errp
+	var expType istio_mixer_v1_config_descriptor.ValueType
+	_ = expType
+
+	if param.SourceUid == "" {
+		b.bldSourceUid = nil
+	} else {
+		b.bldSourceUid, expType, err = expb.Compile(param.SourceUid)
+		if err != nil {
+			return nil, template.NewErrorPath("SourceUid", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SourceUid)
+			return nil, template.NewErrorPath("SourceUid", err)
+		}
+
+	}
+
+	if param.SourceIp == "" {
+		b.bldSourceIp = nil
+	} else {
+		b.bldSourceIp, expType, err = expb.Compile(param.SourceIp)
+		if err != nil {
+			return nil, template.NewErrorPath("SourceIp", err)
+		}
+
+	}
+
+	if param.DestinationUid == "" {
+		b.bldDestinationUid = nil
+	} else {
+		b.bldDestinationUid, expType, err = expb.Compile(param.DestinationUid)
+		if err != nil {
+			return nil, template.NewErrorPath("DestinationUid", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.DestinationUid)
+			return nil, template.NewErrorPath("DestinationUid", err)
+		}
+
+	}
+
+	if param.DestinationIp == "" {
+		b.bldDestinationIp = nil
+	} else {
+		b.bldDestinationIp, expType, err = expb.Compile(param.DestinationIp)
+		if err != nil {
+			return nil, template.NewErrorPath("DestinationIp", err)
+		}
+
+	}
+
+	if param.OriginUid == "" {
+		b.bldOriginUid = nil
+	} else {
+		b.bldOriginUid, expType, err = expb.Compile(param.OriginUid)
+		if err != nil {
+			return nil, template.NewErrorPath("OriginUid", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.OriginUid)
+			return nil, template.NewErrorPath("OriginUid", err)
+		}
+
+	}
+
+	if param.OriginIp == "" {
+		b.bldOriginIp = nil
+	} else {
+		b.bldOriginIp, expType, err = expb.Compile(param.OriginIp)
+		if err != nil {
+			return nil, template.NewErrorPath("OriginIp", err)
+		}
+
+	}
+
+	return b, template.ErrorPath{}
+}
+
+// build and return the instance, given a set of attributes.
+func (b *builder_adapter_template_kubernetes_Template) build(
+	attrs attribute.Bag) (*adapter_template_kubernetes.Instance, template.ErrorPath) {
+
+	if b == nil {
+		return nil, template.ErrorPath{}
+	}
+
+	var err error
+	_ = err
+	var errp template.ErrorPath
+	_ = errp
+	var vBool bool
+	_ = vBool
+	var vInt int64
+	_ = vInt
+	var vString string
+	_ = vString
+	var vDouble float64
+	_ = vDouble
+	var vIface interface{}
+	_ = vIface
+
+	r := &adapter_template_kubernetes.Instance{}
+
+	if b.bldSourceUid != nil {
+
+		vString, err = b.bldSourceUid.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("SourceUid", err)
+		}
+		r.SourceUid = vString
+
+	}
+
+	if b.bldSourceIp != nil {
+
+		if vIface, err = b.bldSourceIp.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("SourceIp", err)
+		}
+
+		r.SourceIp = vIface.(net.IP)
+
+	}
+
+	if b.bldDestinationUid != nil {
+
+		vString, err = b.bldDestinationUid.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("DestinationUid", err)
+		}
+		r.DestinationUid = vString
+
+	}
+
+	if b.bldDestinationIp != nil {
+
+		if vIface, err = b.bldDestinationIp.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("DestinationIp", err)
+		}
+
+		r.DestinationIp = vIface.(net.IP)
+
+	}
+
+	if b.bldOriginUid != nil {
+
+		vString, err = b.bldOriginUid.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("OriginUid", err)
+		}
+		r.OriginUid = vString
+
+	}
+
+	if b.bldOriginIp != nil {
+
+		if vIface, err = b.bldOriginIp.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("OriginIp", err)
+		}
+
+		r.OriginIp = vIface.(net.IP)
+
+	}
+
+	return r, template.ErrorPath{}
+}
+
+// builder struct for constructing an instance of Template.
 type builder_servicecontrolreport_Template struct {
 
 	// builder for field api_version: string.
@@ -3034,119 +3653,184 @@ func newBuilder_servicecontrolreport_Template(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldApiVersion, expType, err = expb.Compile(param.ApiVersion)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiVersion", err)
+	if param.ApiVersion == "" {
+		b.bldApiVersion = nil
+	} else {
+		b.bldApiVersion, expType, err = expb.Compile(param.ApiVersion)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiVersion)
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiVersion)
-		return nil, template.NewErrorPath("ApiVersion", err)
+	if param.ApiOperation == "" {
+		b.bldApiOperation = nil
+	} else {
+		b.bldApiOperation, expType, err = expb.Compile(param.ApiOperation)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiOperation)
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+
 	}
 
-	b.bldApiOperation, expType, err = expb.Compile(param.ApiOperation)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiOperation", err)
+	if param.ApiProtocol == "" {
+		b.bldApiProtocol = nil
+	} else {
+		b.bldApiProtocol, expType, err = expb.Compile(param.ApiProtocol)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiProtocol", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiProtocol)
+			return nil, template.NewErrorPath("ApiProtocol", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiOperation)
-		return nil, template.NewErrorPath("ApiOperation", err)
+	if param.ApiService == "" {
+		b.bldApiService = nil
+	} else {
+		b.bldApiService, expType, err = expb.Compile(param.ApiService)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiService", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiService)
+			return nil, template.NewErrorPath("ApiService", err)
+		}
+
 	}
 
-	b.bldApiProtocol, expType, err = expb.Compile(param.ApiProtocol)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiProtocol", err)
+	if param.ApiKey == "" {
+		b.bldApiKey = nil
+	} else {
+		b.bldApiKey, expType, err = expb.Compile(param.ApiKey)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiKey)
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiProtocol)
-		return nil, template.NewErrorPath("ApiProtocol", err)
+	if param.RequestTime == "" {
+		b.bldRequestTime = nil
+	} else {
+		b.bldRequestTime, expType, err = expb.Compile(param.RequestTime)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestTime", err)
+		}
+
 	}
 
-	b.bldApiService, expType, err = expb.Compile(param.ApiService)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiService", err)
+	if param.RequestMethod == "" {
+		b.bldRequestMethod = nil
+	} else {
+		b.bldRequestMethod, expType, err = expb.Compile(param.RequestMethod)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestMethod", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.RequestMethod)
+			return nil, template.NewErrorPath("RequestMethod", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiService)
-		return nil, template.NewErrorPath("ApiService", err)
+	if param.RequestPath == "" {
+		b.bldRequestPath = nil
+	} else {
+		b.bldRequestPath, expType, err = expb.Compile(param.RequestPath)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestPath", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.RequestPath)
+			return nil, template.NewErrorPath("RequestPath", err)
+		}
+
 	}
 
-	b.bldApiKey, expType, err = expb.Compile(param.ApiKey)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiKey", err)
+	if param.RequestBytes == "" {
+		b.bldRequestBytes = nil
+	} else {
+		b.bldRequestBytes, expType, err = expb.Compile(param.RequestBytes)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestBytes", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.INT64 {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.RequestBytes)
+			return nil, template.NewErrorPath("RequestBytes", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiKey)
-		return nil, template.NewErrorPath("ApiKey", err)
+	if param.ResponseTime == "" {
+		b.bldResponseTime = nil
+	} else {
+		b.bldResponseTime, expType, err = expb.Compile(param.ResponseTime)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseTime", err)
+		}
+
 	}
 
-	b.bldRequestTime, expType, err = expb.Compile(param.RequestTime)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestTime", err)
+	if param.ResponseCode == "" {
+		b.bldResponseCode = nil
+	} else {
+		b.bldResponseCode, expType, err = expb.Compile(param.ResponseCode)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseCode", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.INT64 {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.ResponseCode)
+			return nil, template.NewErrorPath("ResponseCode", err)
+		}
+
 	}
 
-	b.bldRequestMethod, expType, err = expb.Compile(param.RequestMethod)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestMethod", err)
+	if param.ResponseBytes == "" {
+		b.bldResponseBytes = nil
+	} else {
+		b.bldResponseBytes, expType, err = expb.Compile(param.ResponseBytes)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseBytes", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.INT64 {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.ResponseBytes)
+			return nil, template.NewErrorPath("ResponseBytes", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.RequestMethod)
-		return nil, template.NewErrorPath("RequestMethod", err)
-	}
+	if param.ResponseLatency == "" {
+		b.bldResponseLatency = nil
+	} else {
+		b.bldResponseLatency, expType, err = expb.Compile(param.ResponseLatency)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseLatency", err)
+		}
 
-	b.bldRequestPath, expType, err = expb.Compile(param.RequestPath)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestPath", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.RequestPath)
-		return nil, template.NewErrorPath("RequestPath", err)
-	}
-
-	b.bldRequestBytes, expType, err = expb.Compile(param.RequestBytes)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestBytes", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.INT64 {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.RequestBytes)
-		return nil, template.NewErrorPath("RequestBytes", err)
-	}
-
-	b.bldResponseTime, expType, err = expb.Compile(param.ResponseTime)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseTime", err)
-	}
-
-	b.bldResponseCode, expType, err = expb.Compile(param.ResponseCode)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseCode", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.INT64 {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.ResponseCode)
-		return nil, template.NewErrorPath("ResponseCode", err)
-	}
-
-	b.bldResponseBytes, expType, err = expb.Compile(param.ResponseBytes)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseBytes", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.INT64 {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.INT64, expType, param.ResponseBytes)
-		return nil, template.NewErrorPath("ResponseBytes", err)
-	}
-
-	b.bldResponseLatency, expType, err = expb.Compile(param.ResponseLatency)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseLatency", err)
 	}
 
 	return b, template.ErrorPath{}
@@ -3177,83 +3861,135 @@ func (b *builder_servicecontrolreport_Template) build(
 
 	r := &servicecontrolreport.Instance{}
 
-	vString, err = b.bldApiVersion.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiVersion", err)
-	}
-	r.ApiVersion = vString
+	if b.bldApiVersion != nil {
 
-	vString, err = b.bldApiOperation.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiOperation", err)
-	}
-	r.ApiOperation = vString
+		vString, err = b.bldApiVersion.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+		r.ApiVersion = vString
 
-	vString, err = b.bldApiProtocol.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiProtocol", err)
-	}
-	r.ApiProtocol = vString
-
-	vString, err = b.bldApiService.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiService", err)
-	}
-	r.ApiService = vString
-
-	vString, err = b.bldApiKey.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiKey", err)
-	}
-	r.ApiKey = vString
-
-	if vIface, err = b.bldRequestTime.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("RequestTime", err)
 	}
 
-	r.RequestTime = vIface.(time.Time)
+	if b.bldApiOperation != nil {
 
-	vString, err = b.bldRequestMethod.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestMethod", err)
-	}
-	r.RequestMethod = vString
+		vString, err = b.bldApiOperation.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+		r.ApiOperation = vString
 
-	vString, err = b.bldRequestPath.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestPath", err)
-	}
-	r.RequestPath = vString
-
-	vInt, err = b.bldRequestBytes.EvaluateInteger(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("RequestBytes", err)
-	}
-	r.RequestBytes = vInt
-
-	if vIface, err = b.bldResponseTime.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("ResponseTime", err)
 	}
 
-	r.ResponseTime = vIface.(time.Time)
+	if b.bldApiProtocol != nil {
 
-	vInt, err = b.bldResponseCode.EvaluateInteger(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseCode", err)
-	}
-	r.ResponseCode = vInt
+		vString, err = b.bldApiProtocol.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiProtocol", err)
+		}
+		r.ApiProtocol = vString
 
-	vInt, err = b.bldResponseBytes.EvaluateInteger(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ResponseBytes", err)
-	}
-	r.ResponseBytes = vInt
-
-	if vIface, err = b.bldResponseLatency.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("ResponseLatency", err)
 	}
 
-	r.ResponseLatency = vIface.(time.Duration)
+	if b.bldApiService != nil {
+
+		vString, err = b.bldApiService.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiService", err)
+		}
+		r.ApiService = vString
+
+	}
+
+	if b.bldApiKey != nil {
+
+		vString, err = b.bldApiKey.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+		r.ApiKey = vString
+
+	}
+
+	if b.bldRequestTime != nil {
+
+		if vIface, err = b.bldRequestTime.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("RequestTime", err)
+		}
+
+		r.RequestTime = vIface.(time.Time)
+
+	}
+
+	if b.bldRequestMethod != nil {
+
+		vString, err = b.bldRequestMethod.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestMethod", err)
+		}
+		r.RequestMethod = vString
+
+	}
+
+	if b.bldRequestPath != nil {
+
+		vString, err = b.bldRequestPath.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestPath", err)
+		}
+		r.RequestPath = vString
+
+	}
+
+	if b.bldRequestBytes != nil {
+
+		vInt, err = b.bldRequestBytes.EvaluateInteger(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("RequestBytes", err)
+		}
+		r.RequestBytes = vInt
+
+	}
+
+	if b.bldResponseTime != nil {
+
+		if vIface, err = b.bldResponseTime.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("ResponseTime", err)
+		}
+
+		r.ResponseTime = vIface.(time.Time)
+
+	}
+
+	if b.bldResponseCode != nil {
+
+		vInt, err = b.bldResponseCode.EvaluateInteger(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseCode", err)
+		}
+		r.ResponseCode = vInt
+
+	}
+
+	if b.bldResponseBytes != nil {
+
+		vInt, err = b.bldResponseBytes.EvaluateInteger(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ResponseBytes", err)
+		}
+		r.ResponseBytes = vInt
+
+	}
+
+	if b.bldResponseLatency != nil {
+
+		if vIface, err = b.bldResponseLatency.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("ResponseLatency", err)
+		}
+
+		r.ResponseLatency = vIface.(time.Duration)
+
+	}
 
 	return r, template.ErrorPath{}
 }
@@ -3303,49 +4039,74 @@ func newBuilder_apikey_Template(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldApi, expType, err = expb.Compile(param.Api)
-	if err != nil {
-		return nil, template.NewErrorPath("Api", err)
+	if param.Api == "" {
+		b.bldApi = nil
+	} else {
+		b.bldApi, expType, err = expb.Compile(param.Api)
+		if err != nil {
+			return nil, template.NewErrorPath("Api", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Api)
+			return nil, template.NewErrorPath("Api", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Api)
-		return nil, template.NewErrorPath("Api", err)
+	if param.ApiVersion == "" {
+		b.bldApiVersion = nil
+	} else {
+		b.bldApiVersion, expType, err = expb.Compile(param.ApiVersion)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiVersion)
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+
 	}
 
-	b.bldApiVersion, expType, err = expb.Compile(param.ApiVersion)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiVersion", err)
+	if param.ApiOperation == "" {
+		b.bldApiOperation = nil
+	} else {
+		b.bldApiOperation, expType, err = expb.Compile(param.ApiOperation)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiOperation)
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiVersion)
-		return nil, template.NewErrorPath("ApiVersion", err)
+	if param.ApiKey == "" {
+		b.bldApiKey = nil
+	} else {
+		b.bldApiKey, expType, err = expb.Compile(param.ApiKey)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiKey)
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+
 	}
 
-	b.bldApiOperation, expType, err = expb.Compile(param.ApiOperation)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiOperation", err)
-	}
+	if param.Timestamp == "" {
+		b.bldTimestamp = nil
+	} else {
+		b.bldTimestamp, expType, err = expb.Compile(param.Timestamp)
+		if err != nil {
+			return nil, template.NewErrorPath("Timestamp", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiOperation)
-		return nil, template.NewErrorPath("ApiOperation", err)
-	}
-
-	b.bldApiKey, expType, err = expb.Compile(param.ApiKey)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiKey", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ApiKey)
-		return nil, template.NewErrorPath("ApiKey", err)
-	}
-
-	b.bldTimestamp, expType, err = expb.Compile(param.Timestamp)
-	if err != nil {
-		return nil, template.NewErrorPath("Timestamp", err)
 	}
 
 	return b, template.ErrorPath{}
@@ -3376,35 +4137,55 @@ func (b *builder_apikey_Template) build(
 
 	r := &apikey.Instance{}
 
-	vString, err = b.bldApi.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Api", err)
-	}
-	r.Api = vString
+	if b.bldApi != nil {
 
-	vString, err = b.bldApiVersion.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiVersion", err)
-	}
-	r.ApiVersion = vString
+		vString, err = b.bldApi.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Api", err)
+		}
+		r.Api = vString
 
-	vString, err = b.bldApiOperation.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiOperation", err)
-	}
-	r.ApiOperation = vString
-
-	vString, err = b.bldApiKey.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ApiKey", err)
-	}
-	r.ApiKey = vString
-
-	if vIface, err = b.bldTimestamp.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("Timestamp", err)
 	}
 
-	r.Timestamp = vIface.(time.Time)
+	if b.bldApiVersion != nil {
+
+		vString, err = b.bldApiVersion.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiVersion", err)
+		}
+		r.ApiVersion = vString
+
+	}
+
+	if b.bldApiOperation != nil {
+
+		vString, err = b.bldApiOperation.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiOperation", err)
+		}
+		r.ApiOperation = vString
+
+	}
+
+	if b.bldApiKey != nil {
+
+		vString, err = b.bldApiKey.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ApiKey", err)
+		}
+		r.ApiKey = vString
+
+	}
+
+	if b.bldTimestamp != nil {
+
+		if vIface, err = b.bldTimestamp.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("Timestamp", err)
+		}
+
+		r.Timestamp = vIface.(time.Time)
+
+	}
 
 	return r, template.ErrorPath{}
 }
@@ -3478,12 +4259,20 @@ func (b *builder_authorization_Template) build(
 
 	r := &authorization.Instance{}
 
-	if r.Subject, errp = b.bldSubject.build(attrs); !errp.IsNil() {
-		return nil, errp.WithPrefix("Subject")
+	if b.bldSubject != nil {
+
+		if r.Subject, errp = b.bldSubject.build(attrs); !errp.IsNil() {
+			return nil, errp.WithPrefix("Subject")
+		}
+
 	}
 
-	if r.Action, errp = b.bldAction.build(attrs); !errp.IsNil() {
-		return nil, errp.WithPrefix("Action")
+	if b.bldAction != nil {
+
+		if r.Action, errp = b.bldAction.build(attrs); !errp.IsNil() {
+			return nil, errp.WithPrefix("Action")
+		}
+
 	}
 
 	return r, template.ErrorPath{}
@@ -3526,24 +4315,34 @@ func newBuilder_authorization_Subject(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldUser, expType, err = expb.Compile(param.User)
-	if err != nil {
-		return nil, template.NewErrorPath("User", err)
+	if param.User == "" {
+		b.bldUser = nil
+	} else {
+		b.bldUser, expType, err = expb.Compile(param.User)
+		if err != nil {
+			return nil, template.NewErrorPath("User", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.User)
+			return nil, template.NewErrorPath("User", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.User)
-		return nil, template.NewErrorPath("User", err)
-	}
+	if param.Groups == "" {
+		b.bldGroups = nil
+	} else {
+		b.bldGroups, expType, err = expb.Compile(param.Groups)
+		if err != nil {
+			return nil, template.NewErrorPath("Groups", err)
+		}
 
-	b.bldGroups, expType, err = expb.Compile(param.Groups)
-	if err != nil {
-		return nil, template.NewErrorPath("Groups", err)
-	}
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Groups)
+			return nil, template.NewErrorPath("Groups", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Groups)
-		return nil, template.NewErrorPath("Groups", err)
 	}
 
 	b.bldProperties = make(map[string]compiled.Expression, len(param.Properties))
@@ -3584,17 +4383,25 @@ func (b *builder_authorization_Subject) build(
 
 	r := &authorization.Subject{}
 
-	vString, err = b.bldUser.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("User", err)
-	}
-	r.User = vString
+	if b.bldUser != nil {
 
-	vString, err = b.bldGroups.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Groups", err)
+		vString, err = b.bldUser.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("User", err)
+		}
+		r.User = vString
+
 	}
-	r.Groups = vString
+
+	if b.bldGroups != nil {
+
+		vString, err = b.bldGroups.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Groups", err)
+		}
+		r.Groups = vString
+
+	}
 
 	r.Properties = make(map[string]interface{}, len(b.bldProperties))
 
@@ -3656,44 +4463,64 @@ func newBuilder_authorization_Action(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldNamespace, expType, err = expb.Compile(param.Namespace)
-	if err != nil {
-		return nil, template.NewErrorPath("Namespace", err)
+	if param.Namespace == "" {
+		b.bldNamespace = nil
+	} else {
+		b.bldNamespace, expType, err = expb.Compile(param.Namespace)
+		if err != nil {
+			return nil, template.NewErrorPath("Namespace", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Namespace)
+			return nil, template.NewErrorPath("Namespace", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Namespace)
-		return nil, template.NewErrorPath("Namespace", err)
+	if param.Service == "" {
+		b.bldService = nil
+	} else {
+		b.bldService, expType, err = expb.Compile(param.Service)
+		if err != nil {
+			return nil, template.NewErrorPath("Service", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Service)
+			return nil, template.NewErrorPath("Service", err)
+		}
+
 	}
 
-	b.bldService, expType, err = expb.Compile(param.Service)
-	if err != nil {
-		return nil, template.NewErrorPath("Service", err)
+	if param.Method == "" {
+		b.bldMethod = nil
+	} else {
+		b.bldMethod, expType, err = expb.Compile(param.Method)
+		if err != nil {
+			return nil, template.NewErrorPath("Method", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Method)
+			return nil, template.NewErrorPath("Method", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Service)
-		return nil, template.NewErrorPath("Service", err)
-	}
+	if param.Path == "" {
+		b.bldPath = nil
+	} else {
+		b.bldPath, expType, err = expb.Compile(param.Path)
+		if err != nil {
+			return nil, template.NewErrorPath("Path", err)
+		}
 
-	b.bldMethod, expType, err = expb.Compile(param.Method)
-	if err != nil {
-		return nil, template.NewErrorPath("Method", err)
-	}
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Path)
+			return nil, template.NewErrorPath("Path", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Method)
-		return nil, template.NewErrorPath("Method", err)
-	}
-
-	b.bldPath, expType, err = expb.Compile(param.Path)
-	if err != nil {
-		return nil, template.NewErrorPath("Path", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Path)
-		return nil, template.NewErrorPath("Path", err)
 	}
 
 	b.bldProperties = make(map[string]compiled.Expression, len(param.Properties))
@@ -3734,29 +4561,45 @@ func (b *builder_authorization_Action) build(
 
 	r := &authorization.Action{}
 
-	vString, err = b.bldNamespace.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Namespace", err)
-	}
-	r.Namespace = vString
+	if b.bldNamespace != nil {
 
-	vString, err = b.bldService.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Service", err)
-	}
-	r.Service = vString
+		vString, err = b.bldNamespace.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Namespace", err)
+		}
+		r.Namespace = vString
 
-	vString, err = b.bldMethod.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Method", err)
 	}
-	r.Method = vString
 
-	vString, err = b.bldPath.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Path", err)
+	if b.bldService != nil {
+
+		vString, err = b.bldService.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Service", err)
+		}
+		r.Service = vString
+
 	}
-	r.Path = vString
+
+	if b.bldMethod != nil {
+
+		vString, err = b.bldMethod.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Method", err)
+		}
+		r.Method = vString
+
+	}
+
+	if b.bldPath != nil {
+
+		vString, err = b.bldPath.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Path", err)
+		}
+		r.Path = vString
+
+	}
 
 	r.Properties = make(map[string]interface{}, len(b.bldProperties))
 
@@ -3858,14 +4701,19 @@ func newBuilder_listentry_Template(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldValue, expType, err = expb.Compile(param.Value)
-	if err != nil {
-		return nil, template.NewErrorPath("Value", err)
-	}
+	if param.Value == "" {
+		b.bldValue = nil
+	} else {
+		b.bldValue, expType, err = expb.Compile(param.Value)
+		if err != nil {
+			return nil, template.NewErrorPath("Value", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Value)
-		return nil, template.NewErrorPath("Value", err)
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Value)
+			return nil, template.NewErrorPath("Value", err)
+		}
+
 	}
 
 	return b, template.ErrorPath{}
@@ -3896,11 +4744,15 @@ func (b *builder_listentry_Template) build(
 
 	r := &listentry.Instance{}
 
-	vString, err = b.bldValue.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Value", err)
+	if b.bldValue != nil {
+
+		vString, err = b.bldValue.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Value", err)
+		}
+		r.Value = vString
+
 	}
-	r.Value = vString
 
 	return r, template.ErrorPath{}
 }
@@ -3960,29 +4812,44 @@ func newBuilder_logentry_Template(
 		b.bldVariables[k] = exp
 	}
 
-	b.bldTimestamp, expType, err = expb.Compile(param.Timestamp)
-	if err != nil {
-		return nil, template.NewErrorPath("Timestamp", err)
+	if param.Timestamp == "" {
+		b.bldTimestamp = nil
+	} else {
+		b.bldTimestamp, expType, err = expb.Compile(param.Timestamp)
+		if err != nil {
+			return nil, template.NewErrorPath("Timestamp", err)
+		}
+
 	}
 
-	b.bldSeverity, expType, err = expb.Compile(param.Severity)
-	if err != nil {
-		return nil, template.NewErrorPath("Severity", err)
+	if param.Severity == "" {
+		b.bldSeverity = nil
+	} else {
+		b.bldSeverity, expType, err = expb.Compile(param.Severity)
+		if err != nil {
+			return nil, template.NewErrorPath("Severity", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Severity)
+			return nil, template.NewErrorPath("Severity", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.Severity)
-		return nil, template.NewErrorPath("Severity", err)
-	}
+	if param.MonitoredResourceType == "" {
+		b.bldMonitoredResourceType = nil
+	} else {
+		b.bldMonitoredResourceType, expType, err = expb.Compile(param.MonitoredResourceType)
+		if err != nil {
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
 
-	b.bldMonitoredResourceType, expType, err = expb.Compile(param.MonitoredResourceType)
-	if err != nil {
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
-	}
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.MonitoredResourceType)
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.MonitoredResourceType)
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
 	}
 
 	b.bldMonitoredResourceDimensions = make(map[string]compiled.Expression, len(param.MonitoredResourceDimensions))
@@ -4035,23 +4902,35 @@ func (b *builder_logentry_Template) build(
 
 	}
 
-	if vIface, err = b.bldTimestamp.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("Timestamp", err)
+	if b.bldTimestamp != nil {
+
+		if vIface, err = b.bldTimestamp.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("Timestamp", err)
+		}
+
+		r.Timestamp = vIface.(time.Time)
+
 	}
 
-	r.Timestamp = vIface.(time.Time)
+	if b.bldSeverity != nil {
 
-	vString, err = b.bldSeverity.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("Severity", err)
-	}
-	r.Severity = vString
+		vString, err = b.bldSeverity.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("Severity", err)
+		}
+		r.Severity = vString
 
-	vString, err = b.bldMonitoredResourceType.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
 	}
-	r.MonitoredResourceType = vString
+
+	if b.bldMonitoredResourceType != nil {
+
+		vString, err = b.bldMonitoredResourceType.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
+		r.MonitoredResourceType = vString
+
+	}
 
 	r.MonitoredResourceDimensions = make(map[string]interface{}, len(b.bldMonitoredResourceDimensions))
 
@@ -4109,9 +4988,14 @@ func newBuilder_metric_Template(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldValue, expType, err = expb.Compile(param.Value)
-	if err != nil {
-		return nil, template.NewErrorPath("Value", err)
+	if param.Value == "" {
+		b.bldValue = nil
+	} else {
+		b.bldValue, expType, err = expb.Compile(param.Value)
+		if err != nil {
+			return nil, template.NewErrorPath("Value", err)
+		}
+
 	}
 
 	b.bldDimensions = make(map[string]compiled.Expression, len(param.Dimensions))
@@ -4124,14 +5008,19 @@ func newBuilder_metric_Template(
 		b.bldDimensions[k] = exp
 	}
 
-	b.bldMonitoredResourceType, expType, err = expb.Compile(param.MonitoredResourceType)
-	if err != nil {
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
-	}
+	if param.MonitoredResourceType == "" {
+		b.bldMonitoredResourceType = nil
+	} else {
+		b.bldMonitoredResourceType, expType, err = expb.Compile(param.MonitoredResourceType)
+		if err != nil {
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.MonitoredResourceType)
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.MonitoredResourceType)
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
+
 	}
 
 	b.bldMonitoredResourceDimensions = make(map[string]compiled.Expression, len(param.MonitoredResourceDimensions))
@@ -4172,11 +5061,15 @@ func (b *builder_metric_Template) build(
 
 	r := &metric.Instance{}
 
-	if vIface, err = b.bldValue.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("Value", err)
-	}
+	if b.bldValue != nil {
 
-	r.Value = vIface
+		if vIface, err = b.bldValue.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("Value", err)
+		}
+
+		r.Value = vIface
+
+	}
 
 	r.Dimensions = make(map[string]interface{}, len(b.bldDimensions))
 
@@ -4190,11 +5083,15 @@ func (b *builder_metric_Template) build(
 
 	}
 
-	vString, err = b.bldMonitoredResourceType.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("MonitoredResourceType", err)
+	if b.bldMonitoredResourceType != nil {
+
+		vString, err = b.bldMonitoredResourceType.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("MonitoredResourceType", err)
+		}
+		r.MonitoredResourceType = vString
+
 	}
-	r.MonitoredResourceType = vString
 
 	r.MonitoredResourceDimensions = make(map[string]interface{}, len(b.bldMonitoredResourceDimensions))
 
@@ -4402,54 +5299,84 @@ func newBuilder_tracespan_Template(
 	var expType istio_mixer_v1_config_descriptor.ValueType
 	_ = expType
 
-	b.bldTraceId, expType, err = expb.Compile(param.TraceId)
-	if err != nil {
-		return nil, template.NewErrorPath("TraceId", err)
+	if param.TraceId == "" {
+		b.bldTraceId = nil
+	} else {
+		b.bldTraceId, expType, err = expb.Compile(param.TraceId)
+		if err != nil {
+			return nil, template.NewErrorPath("TraceId", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.TraceId)
+			return nil, template.NewErrorPath("TraceId", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.TraceId)
-		return nil, template.NewErrorPath("TraceId", err)
+	if param.SpanId == "" {
+		b.bldSpanId = nil
+	} else {
+		b.bldSpanId, expType, err = expb.Compile(param.SpanId)
+		if err != nil {
+			return nil, template.NewErrorPath("SpanId", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SpanId)
+			return nil, template.NewErrorPath("SpanId", err)
+		}
+
 	}
 
-	b.bldSpanId, expType, err = expb.Compile(param.SpanId)
-	if err != nil {
-		return nil, template.NewErrorPath("SpanId", err)
+	if param.ParentSpanId == "" {
+		b.bldParentSpanId = nil
+	} else {
+		b.bldParentSpanId, expType, err = expb.Compile(param.ParentSpanId)
+		if err != nil {
+			return nil, template.NewErrorPath("ParentSpanId", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ParentSpanId)
+			return nil, template.NewErrorPath("ParentSpanId", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SpanId)
-		return nil, template.NewErrorPath("SpanId", err)
+	if param.SpanName == "" {
+		b.bldSpanName = nil
+	} else {
+		b.bldSpanName, expType, err = expb.Compile(param.SpanName)
+		if err != nil {
+			return nil, template.NewErrorPath("SpanName", err)
+		}
+
+		if expType != istio_mixer_v1_config_descriptor.STRING {
+			err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SpanName)
+			return nil, template.NewErrorPath("SpanName", err)
+		}
+
 	}
 
-	b.bldParentSpanId, expType, err = expb.Compile(param.ParentSpanId)
-	if err != nil {
-		return nil, template.NewErrorPath("ParentSpanId", err)
+	if param.StartTime == "" {
+		b.bldStartTime = nil
+	} else {
+		b.bldStartTime, expType, err = expb.Compile(param.StartTime)
+		if err != nil {
+			return nil, template.NewErrorPath("StartTime", err)
+		}
+
 	}
 
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.ParentSpanId)
-		return nil, template.NewErrorPath("ParentSpanId", err)
-	}
+	if param.EndTime == "" {
+		b.bldEndTime = nil
+	} else {
+		b.bldEndTime, expType, err = expb.Compile(param.EndTime)
+		if err != nil {
+			return nil, template.NewErrorPath("EndTime", err)
+		}
 
-	b.bldSpanName, expType, err = expb.Compile(param.SpanName)
-	if err != nil {
-		return nil, template.NewErrorPath("SpanName", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SpanName)
-		return nil, template.NewErrorPath("SpanName", err)
-	}
-
-	b.bldStartTime, expType, err = expb.Compile(param.StartTime)
-	if err != nil {
-		return nil, template.NewErrorPath("StartTime", err)
-	}
-
-	b.bldEndTime, expType, err = expb.Compile(param.EndTime)
-	if err != nil {
-		return nil, template.NewErrorPath("EndTime", err)
 	}
 
 	b.bldSpanTags = make(map[string]compiled.Expression, len(param.SpanTags))
@@ -4490,41 +5417,65 @@ func (b *builder_tracespan_Template) build(
 
 	r := &tracespan.Instance{}
 
-	vString, err = b.bldTraceId.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("TraceId", err)
-	}
-	r.TraceId = vString
+	if b.bldTraceId != nil {
 
-	vString, err = b.bldSpanId.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("SpanId", err)
-	}
-	r.SpanId = vString
+		vString, err = b.bldTraceId.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("TraceId", err)
+		}
+		r.TraceId = vString
 
-	vString, err = b.bldParentSpanId.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("ParentSpanId", err)
-	}
-	r.ParentSpanId = vString
-
-	vString, err = b.bldSpanName.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("SpanName", err)
-	}
-	r.SpanName = vString
-
-	if vIface, err = b.bldStartTime.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("StartTime", err)
 	}
 
-	r.StartTime = vIface.(time.Time)
+	if b.bldSpanId != nil {
 
-	if vIface, err = b.bldEndTime.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("EndTime", err)
+		vString, err = b.bldSpanId.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("SpanId", err)
+		}
+		r.SpanId = vString
+
 	}
 
-	r.EndTime = vIface.(time.Time)
+	if b.bldParentSpanId != nil {
+
+		vString, err = b.bldParentSpanId.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("ParentSpanId", err)
+		}
+		r.ParentSpanId = vString
+
+	}
+
+	if b.bldSpanName != nil {
+
+		vString, err = b.bldSpanName.EvaluateString(attrs)
+		if err != nil {
+			return nil, template.NewErrorPath("SpanName", err)
+		}
+		r.SpanName = vString
+
+	}
+
+	if b.bldStartTime != nil {
+
+		if vIface, err = b.bldStartTime.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("StartTime", err)
+		}
+
+		r.StartTime = vIface.(time.Time)
+
+	}
+
+	if b.bldEndTime != nil {
+
+		if vIface, err = b.bldEndTime.Evaluate(attrs); err != nil {
+			return nil, template.NewErrorPath("EndTime", err)
+		}
+
+		r.EndTime = vIface.(time.Time)
+
+	}
 
 	r.SpanTags = make(map[string]interface{}, len(b.bldSpanTags))
 
@@ -4537,167 +5488,6 @@ func (b *builder_tracespan_Template) build(
 		r.SpanTags[k] = vIface
 
 	}
-
-	return r, template.ErrorPath{}
-}
-
-// builder struct for constructing an instance of Template.
-type builder_adapter_template_kubernetesenv_Template struct {
-
-	// builder for field source_uid: string.
-
-	bldSourceUid compiled.Expression
-
-	// builder for field source_ip: net.IP.
-
-	bldSourceIp compiled.Expression
-
-	// builder for field destination_uid: string.
-
-	bldDestinationUid compiled.Expression
-
-	// builder for field destination_ip: net.IP.
-
-	bldDestinationIp compiled.Expression
-
-	// builder for field origin_uid: string.
-
-	bldOriginUid compiled.Expression
-
-	// builder for field origin_ip: net.IP.
-
-	bldOriginIp compiled.Expression
-} // builder_adapter_template_kubernetesenv_Template
-
-// Instantiates and returns a new builder for Template, based on the provided instance parameter.
-func newBuilder_adapter_template_kubernetesenv_Template(
-	expb *compiled.ExpressionBuilder,
-	param *adapter_template_kubernetesenv.InstanceParam) (*builder_adapter_template_kubernetesenv_Template, template.ErrorPath) {
-
-	// If the parameter is nil. Simply return nil. The builder, then, will also return nil.
-	if param == nil {
-		return nil, template.ErrorPath{}
-	}
-
-	b := &builder_adapter_template_kubernetesenv_Template{}
-
-	var exp compiled.Expression
-	_ = exp
-	var err error
-	_ = err
-	var errp template.ErrorPath
-	_ = errp
-	var expType istio_mixer_v1_config_descriptor.ValueType
-	_ = expType
-
-	b.bldSourceUid, expType, err = expb.Compile(param.SourceUid)
-	if err != nil {
-		return nil, template.NewErrorPath("SourceUid", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.SourceUid)
-		return nil, template.NewErrorPath("SourceUid", err)
-	}
-
-	b.bldSourceIp, expType, err = expb.Compile(param.SourceIp)
-	if err != nil {
-		return nil, template.NewErrorPath("SourceIp", err)
-	}
-
-	b.bldDestinationUid, expType, err = expb.Compile(param.DestinationUid)
-	if err != nil {
-		return nil, template.NewErrorPath("DestinationUid", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.DestinationUid)
-		return nil, template.NewErrorPath("DestinationUid", err)
-	}
-
-	b.bldDestinationIp, expType, err = expb.Compile(param.DestinationIp)
-	if err != nil {
-		return nil, template.NewErrorPath("DestinationIp", err)
-	}
-
-	b.bldOriginUid, expType, err = expb.Compile(param.OriginUid)
-	if err != nil {
-		return nil, template.NewErrorPath("OriginUid", err)
-	}
-
-	if expType != istio_mixer_v1_config_descriptor.STRING {
-		err = fmt.Errorf("instance field type mismatch: expected='%v', actual='%v', expression='%s'", istio_mixer_v1_config_descriptor.STRING, expType, param.OriginUid)
-		return nil, template.NewErrorPath("OriginUid", err)
-	}
-
-	b.bldOriginIp, expType, err = expb.Compile(param.OriginIp)
-	if err != nil {
-		return nil, template.NewErrorPath("OriginIp", err)
-	}
-
-	return b, template.ErrorPath{}
-}
-
-// build and return the instance, given a set of attributes.
-func (b *builder_adapter_template_kubernetesenv_Template) build(
-	attrs attribute.Bag) (*adapter_template_kubernetesenv.Instance, template.ErrorPath) {
-
-	if b == nil {
-		return nil, template.ErrorPath{}
-	}
-
-	var err error
-	_ = err
-	var errp template.ErrorPath
-	_ = errp
-	var vBool bool
-	_ = vBool
-	var vInt int64
-	_ = vInt
-	var vString string
-	_ = vString
-	var vDouble float64
-	_ = vDouble
-	var vIface interface{}
-	_ = vIface
-
-	r := &adapter_template_kubernetesenv.Instance{}
-
-	vString, err = b.bldSourceUid.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("SourceUid", err)
-	}
-	r.SourceUid = vString
-
-	if vIface, err = b.bldSourceIp.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("SourceIp", err)
-	}
-
-	r.SourceIp = net.IP(vIface.([]uint8))
-
-	vString, err = b.bldDestinationUid.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("DestinationUid", err)
-	}
-	r.DestinationUid = vString
-
-	if vIface, err = b.bldDestinationIp.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("DestinationIp", err)
-	}
-
-	r.DestinationIp = net.IP(vIface.([]uint8))
-
-	vString, err = b.bldOriginUid.EvaluateString(attrs)
-	if err != nil {
-		return nil, template.NewErrorPath("OriginUid", err)
-	}
-	r.OriginUid = vString
-
-	if vIface, err = b.bldOriginIp.Evaluate(attrs); err != nil {
-		return nil, template.NewErrorPath("OriginIp", err)
-	}
-
-	r.OriginIp = net.IP(vIface.([]uint8))
 
 	return r, template.ErrorPath{}
 }

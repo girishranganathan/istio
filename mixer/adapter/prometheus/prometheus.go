@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -341,7 +342,7 @@ func promLabels(l map[string]interface{}) prometheus.Labels {
 	return labels
 }
 
-func computeSha(m *config.Params_MetricInfo, log adapter.Logger) [sha1.Size]byte {
+func computeSha(m proto.Marshaler, log adapter.Logger) [sha1.Size]byte {
 	ba, err := m.Marshal()
 	if err != nil {
 		log.Warningf("Unable to encode %v", err)
