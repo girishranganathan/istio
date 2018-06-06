@@ -139,12 +139,12 @@ func TestRuntime_OnConfigChange(t *testing.T) {
 	}
 	rt.onConfigChange(events)
 
-	snapshot := rt.ephemeral.BuildSnapshot()
+	snapshot, _ := rt.ephemeral.BuildSnapshot()
 
 	// expect the newly declared attribute to be received by the ephemeral state of the runtime, as part
 	// of listening.
 	expected := `
-ID: 4
+ID: 3
 Templates:
   Name: tapa
   Name: tcheck
@@ -253,6 +253,7 @@ func TestRuntime_InFlightRequestsDuringConfigChange(t *testing.T) {
 	callErr := errors.New("call haven't completed yet")
 	go func() {
 		_, callErr = rt.Dispatcher().Check(context.Background(), bag)
+
 		callComplete = true
 		callCompleteCh <- struct{}{}
 	}()
