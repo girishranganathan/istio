@@ -1,4 +1,4 @@
-// Copyright 2018 Istio Authors. All Rights Reserved.
+// Copyright 2018 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package istioAuthnPeerRejectNoMtls
+package client_test
 
 import (
 	"fmt"
@@ -23,10 +23,8 @@ import (
 
 // The Istio authn envoy config
 const authnConfig = `
-{
-  "type": "decoder",
-  "name": "istio_authn",
-  "config": {
+- name: istio_authn
+  config: {
     "policy": {
       "peers": [
         {
@@ -38,7 +36,6 @@ const authnConfig = `
       "principal_binding": 0
     }
   }
-},
 `
 
 const respExpected = "Peer authentication failed."

@@ -16,8 +16,12 @@ ingress:
 prometheus:
   enabled: true
 
+pilot:
+  traceSampling: 100.0
+
 sidecarInjectorWebhook:
   enabled: true
+  enableNamespacesByDefault: false
 
 grafana:
   enabled: true
@@ -26,4 +30,10 @@ tracing:
   enabled: true
 
 servicegraph:
+  enabled: true
+
+galley:
+  enabled: true
+
+kiali:
   enabled: true

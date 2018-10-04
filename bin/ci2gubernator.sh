@@ -1,10 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Exit immediately for non zero status
 set -e
 
 SCRIPTPATH="$(cd "$(dirname "$0")" ; pwd -P)"
-ROOTDIR="$(dirname ${SCRIPTPATH})"
+ROOTDIR="$(dirname "${SCRIPTPATH}")"
+
+# Set GOPATH to match the expected layout
+GO_TOP=$(cd "$(dirname "$0")"/../../../..; pwd)
+export GOPATH=${GOPATH:-$GO_TOP}
 
 REQUIRED_ENVS=(
 	GCS_BUCKET_TOKEN
@@ -16,7 +20,7 @@ REQUIRED_ENVS=(
 )
 
 for env in "${REQUIRED_ENVS[@]}"; do
-	if eval [ -z \$${env} ]; then
+	if eval [ -z \$"${env}" ]; then
 		echo "${env} not defined"
 		exit 0
 	fi
@@ -29,18 +33,26 @@ openssl aes-256-cbc -d -in "${ENCRYPTED_SA_JSON}" -out "${TMP_SA_JSON}" -k "${GC
 
 go get -u istio.io/test-infra/toolbox/ci2gubernator
 
-ARGS=(
-	--service_account="${TMP_SA_JSON}" \
-	--sha=${CIRCLE_BRANCH}/${CIRCLE_SHA1} \
-	--org=${CIRCLE_PROJECT_USERNAME} \
-	--repo=${CIRCLE_PROJECT_REPONAME} \
-	--job=${CIRCLE_JOB} \
-	--build_number=${CIRCLE_BUILD_NUM} \
-	--pr_number=${CIRCLE_PR_NUMBER:-0}
-)
-
-if [ -n "$CIRCLE_PULL_REQUEST" ]; then
-	ARGS+=(--stage=presubmit)
+if [[ -d "${GOPATH}/bin/ci2gubernator" ]];then
+    echo "download istio.io/test-infra/toolbox/ci2gubernator failed"
+    exit 1
 fi
 
-/go/bin/ci2gubernator ${@} ${ARGS[@]} || true
+ARGS=(
+	"--service_account=${TMP_SA_JSON}" \
+	"--sha=${CIRCLE_BRANCH}/${CIRCLE_SHA1}" \
+	"--org=${CIRCLE_PROJECT_USERNAME}" \
+	"--repo=${CIRCLE_PROJECT_REPONAME}" \
+	"--job=${CIRCLE_JOB}" \
+	"--build_number=${CIRCLE_BUILD_NUM}" \
+	"--pr_number=${CIRCLE_PR_NUMBER:-0}"
+)
+
+# CIRCLE_PR_NUMBER is set for PRs that originate from a fork.
+# CIRCLE_PULL_REQUEST is set for PRs that originate from a branch.
+if [ -n "$CIRCLE_PR_NUMBER" ] || [ -n "$CIRCLE_PULL_REQUEST" ]; then
+	ARGS+=("--stage=presubmit")
+fi
+
+ci2gubernator=${GOPATH}/bin/ci2gubernator
+$ci2gubernator "${@}" "${ARGS[@]}" || true

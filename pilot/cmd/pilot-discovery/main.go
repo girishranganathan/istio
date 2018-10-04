@@ -29,32 +29,47 @@ import (
 	"istio.io/istio/pkg/collateral"
 	"istio.io/istio/pkg/ctrlz"
 	"istio.io/istio/pkg/log"
+	"istio.io/istio/pkg/mcp/creds"
 	"istio.io/istio/pkg/version"
 )
 
 var (
-	serverArgs bootstrap.PilotArgs
+	httpPort       int
+	monitoringPort int
+	serverArgs     = bootstrap.PilotArgs{
+		CtrlZOptions:         ctrlz.DefaultOptions(),
+		MCPCredentialOptions: creds.DefaultOptions(),
+	}
 
 	loggingOptions = log.DefaultOptions()
 
-	ctrlzOptions = ctrlz.DefaultOptions()
-
 	rootCmd = &cobra.Command{
-		Use:   "pilot-discovery",
-		Short: "Istio Pilot",
-		Long:  "Istio Pilot provides fleet-wide traffic management capabilities in the Istio Service Mesh.",
+		Use:          "pilot-discovery",
+		Short:        "Istio Pilot.",
+		Long:         "Istio Pilot provides fleet-wide traffic management capabilities in the Istio Service Mesh.",
+		SilenceUsage: true,
 	}
 
 	discoveryCmd = &cobra.Command{
 		Use:   "discovery",
-		Short: "Start Istio proxy discovery service",
+		Short: "Start Istio proxy discovery service.",
+		Args:  cobra.ExactArgs(0),
 		RunE: func(c *cobra.Command, args []string) error {
+			cmd.PrintFlags(c.Flags())
 			if err := log.Configure(loggingOptions); err != nil {
 				return err
 			}
 
 			// Create the stop channel for all of the servers.
 			stop := make(chan struct{})
+
+			// Apply deprecated flags if set to a value other than the default.
+			if serverArgs.DiscoveryOptions.HTTPAddr == ":8080" && httpPort != 8080 {
+				serverArgs.DiscoveryOptions.HTTPAddr = fmt.Sprintf(":%d", httpPort)
+			}
+			if serverArgs.DiscoveryOptions.MonitoringAddr == ":9093" && monitoringPort != 9093 {
+				serverArgs.DiscoveryOptions.MonitoringAddr = fmt.Sprintf(":%d", monitoringPort)
+			}
 
 			// Create the server for the discovery service.
 			discoveryServer, err := bootstrap.NewServer(serverArgs)
@@ -63,8 +78,7 @@ var (
 			}
 
 			// Start the server
-			_, err = discoveryServer.Start(stop)
-			if err != nil {
+			if err := discoveryServer.Start(stop); err != nil {
 				return fmt.Errorf("failed to start discovery service: %v", err)
 			}
 
@@ -78,13 +92,11 @@ func init() {
 	discoveryCmd.PersistentFlags().StringSliceVar(&serverArgs.Service.Registries, "registries",
 		[]string{string(serviceregistry.KubernetesRegistry)},
 		fmt.Sprintf("Comma separated list of platform service registries to read from (choose one or more from {%s, %s, %s, %s, %s})",
-			serviceregistry.KubernetesRegistry, serviceregistry.ConsulRegistry, serviceregistry.EurekaRegistry,
-			serviceregistry.CloudFoundryRegistry, serviceregistry.MockRegistry))
-	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.CFConfig, "cfConfig", "",
-		"Cloud Foundry config file")
+			serviceregistry.KubernetesRegistry, serviceregistry.ConsulRegistry,
+			serviceregistry.MCPRegistry, serviceregistry.MockRegistry, serviceregistry.ConfigRegistry))
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.ClusterRegistriesConfigmap, "clusterRegistriesConfigMap", "",
 		"ConfigMap map for clusters config store")
-	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.ClusterRegistriesNamespace, "clusterRegistriesNamespace", "istio-system",
+	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.ClusterRegistriesNamespace, "clusterRegistriesNamespace", metav1.NamespaceAll,
 		"Namespace for ConfigMap which stores clusters configs")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.KubeConfig, "kubeconfig", "",
 		"Use a Kubernetes configuration file instead of in-cluster configuration")
@@ -92,8 +104,19 @@ func init() {
 		fmt.Sprintf("File name for Istio mesh configuration. If not specified, a default mesh will be used."))
 	discoveryCmd.PersistentFlags().StringVarP(&serverArgs.Namespace, "namespace", "n", "",
 		"Select a namespace where the controller resides. If not set, uses ${POD_NAMESPACE} environment variable")
+	discoveryCmd.PersistentFlags().StringSliceVar(&serverArgs.Plugins, "plugins", bootstrap.DefaultPlugins,
+		"comma separated list of networking plugins to enable")
+
+	// MCP client flags
+	discoveryCmd.PersistentFlags().StringSliceVar(&serverArgs.MCPServerAddrs, "mcpServerAddrs", []string{},
+		"comma separated list of MCP server addresses with "+
+			"mcp:// (insecure) or mcps:// (secure) schema, e.g. mcps://istio-galley.istio-system.svc:9901")
+	serverArgs.MCPCredentialOptions.AttachCobraFlags(discoveryCmd)
 
 	// Config Controller options
+	discoveryCmd.PersistentFlags().BoolVar(&serverArgs.Config.DisableInstallCRDs, "disable-install-crds", false,
+		"Disable discovery service from verifying the existence of CRDs at startup and then installing if not detected.  "+
+			"It is recommended to be disable for highly available setups.")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Config.FileDir, "configDir", "",
 		"Directory to watch for updates to config yaml files. If specified, the files will be used as the source of config, rather than a CRD client.")
 	discoveryCmd.PersistentFlags().StringVarP(&serverArgs.Config.ControllerOptions.WatchedNamespace, "appNamespace",
@@ -107,34 +130,37 @@ func init() {
 		"URL for the Consul server")
 	discoveryCmd.PersistentFlags().DurationVar(&serverArgs.Service.Consul.Interval, "consulserverInterval", 2*time.Second,
 		"Interval (in seconds) for polling the Consul service registry")
-	discoveryCmd.PersistentFlags().StringVar(&serverArgs.Service.Eureka.ServerURL, "eurekaserverURL", "",
-		"URL for the Eureka server")
-	discoveryCmd.PersistentFlags().DurationVar(&serverArgs.Service.Eureka.Interval, "eurekaserverInterval", 2*time.Second,
-		"Interval (in seconds) for polling the Eureka service registry")
-	discoveryCmd.PersistentFlags().IntVar(&serverArgs.DiscoveryOptions.Port, "port", 8080,
-		"Discovery service port")
+
 	// using address, so it can be configured as localhost:.. (possibly UDS in future)
+	discoveryCmd.PersistentFlags().StringVar(&serverArgs.DiscoveryOptions.HTTPAddr, "httpAddr", ":8080",
+		"Discovery service HTTP address")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.DiscoveryOptions.GrpcAddr, "grpcAddr", ":15010",
 		"Discovery service grpc address")
 	discoveryCmd.PersistentFlags().StringVar(&serverArgs.DiscoveryOptions.SecureGrpcAddr, "secureGrpcAddr", ":15012",
 		"Discovery service grpc address, with https")
-	discoveryCmd.PersistentFlags().IntVar(&serverArgs.DiscoveryOptions.MonitoringPort, "monitoringPort", 9093,
-		"HTTP port to use for the exposing pilot self-monitoring information")
+	discoveryCmd.PersistentFlags().StringVar(&serverArgs.DiscoveryOptions.MonitoringAddr, "monitoringAddr", ":9093",
+		"HTTP address to use for the exposing pilot self-monitoring information")
 	discoveryCmd.PersistentFlags().BoolVar(&serverArgs.DiscoveryOptions.EnableProfiling, "profile", true,
 		"Enable profiling via web interface host:port/debug/pprof")
-	discoveryCmd.PersistentFlags().BoolVar(&serverArgs.DiscoveryOptions.EnableCaching, "discovery_cache", true,
+	discoveryCmd.PersistentFlags().BoolVar(&serverArgs.DiscoveryOptions.EnableCaching, "discoveryCache", true,
 		"Enable caching discovery service responses")
-	// TODO (rshriram): Need v1/v2 endpoints and option to selectively
-	// enable webhook for specific xDS config (cds/lds/etc).
-	discoveryCmd.PersistentFlags().StringVar(&serverArgs.DiscoveryOptions.WebhookEndpoint, "webhookEndpoint", "",
+
+	// Deprecated flags.
+	var dummy string
+	discoveryCmd.PersistentFlags().StringVar(&dummy, "webhookEndpoint", "",
 		"Webhook API endpoint (supports http://sockethost, and unix:///absolute/path/to/socket")
+	discoveryCmd.PersistentFlags().MarkDeprecated("webhookEndpoint", "Stop using, it will be remove in a future release")
+	discoveryCmd.PersistentFlags().IntVar(&httpPort, "port", 8080, "Discovery service port")
+	discoveryCmd.PersistentFlags().MarkDeprecated("port", "Use --httpAddr instead")
+	discoveryCmd.PersistentFlags().IntVar(&monitoringPort, "monitoringPort", 9093,
+		"HTTP port to use for the exposing pilot self-monitoring information")
+	discoveryCmd.PersistentFlags().MarkDeprecated("monitoringPort", "Use --monitoringAddr instead")
 
 	// Attach the Istio logging options to the command.
 	loggingOptions.AttachCobraFlags(rootCmd)
 
 	// Attach the Istio Ctrlz options to the command.
-	ctrlzOptions.AttachCobraFlags(rootCmd)
-	serverArgs.CtrlZOptions = ctrlzOptions
+	serverArgs.CtrlZOptions.AttachCobraFlags(rootCmd)
 
 	cmd.AddFlags(rootCmd)
 

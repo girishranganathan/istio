@@ -1,4 +1,4 @@
-// Copyright 2018 Istio Authors.
+// Copyright 2018 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ func TestController_processRBACRoles(t *testing.T) {
 		}},
 	}
 
-	r := &configStore{}
+	r := &ConfigStore{}
 	c := &controller{
 		configState: configState,
 		rbacStore:   r,
@@ -95,21 +95,21 @@ func TestController_processRBACRoles(t *testing.T) {
 		},
 	}
 
-	if len(r.roles) != 1 {
-		t.Fatalf("Got %d, want 1 instnace", len(r.roles))
+	if len(r.Roles) != 1 {
+		t.Fatalf("Got %d, want 1 instance", len(r.Roles))
 	}
 
-	roles := r.roles["ns1"]
+	roles := r.Roles["ns1"]
 	if roles == nil || roles["role1"] == nil {
 		t.Fatalf("role1 is not populated.")
 	}
 
-	info := roles["role1"].info
+	info := roles["role1"].Info
 	if !reflect.DeepEqual(info, wantRole) {
 		t.Fatalf("Got %v, want %v", info, wantRole)
 	}
 
-	bindings := roles["role1"].bindings
+	bindings := roles["role1"].Bindings
 	if len(bindings) != 1 {
 		t.Fatalf("Got %d, want 1 binding associated with role1", len(bindings))
 	}

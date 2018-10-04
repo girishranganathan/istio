@@ -1,4 +1,4 @@
-// Copyright 2018 Istio Authors. All Rights Reserved.
+// Copyright 2018 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tcpFilterPeriodicalReport
+package client_test
 
 import (
 	"fmt"
@@ -22,18 +22,46 @@ import (
 )
 
 // Report attributes from a good POST request
-const deltaReportAttributesOkPost = `
+const openReportAttributesOkPost = `
 {
   "context.protocol": "tcp",
   "context.time": "*",
+  "context.reporter.uid": "",
   "mesh1.ip": "[1 1 1 1]",
   "source.ip": "[127 0 0 1]",
-  "source.port": "*",
   "target.uid": "POD222",
   "target.namespace": "XYZ222",
   "destination.ip": "[127 0 0 1]",
   "destination.port": "*",
+  "destination.uid": "",
+  "destination.namespace": "",
   "connection.mtls": false,
+  "origin.ip": "[127 0 0 1]",
+  "check.cache_hit": false,
+  "quota.cache_hit": false,
+  "connection.received.bytes": 191,
+  "connection.received.bytes_total": 191,
+  "connection.sent.bytes": 0,
+  "connection.sent.bytes_total": 0,
+  "connection.id": "*",
+  "connection.event": "open"
+}
+`
+const deltaReportAttributesOkPost = `
+{
+  "context.protocol": "tcp",
+  "context.time": "*",
+  "context.reporter.uid": "",
+  "mesh1.ip": "[1 1 1 1]",
+  "source.ip": "[127 0 0 1]",
+  "target.uid": "POD222",
+  "target.namespace": "XYZ222",
+  "destination.ip": "[127 0 0 1]",
+  "destination.port": "*",
+  "destination.uid": "",
+  "destination.namespace": "",
+  "connection.mtls": false,
+  "origin.ip": "[127 0 0 1]",
   "check.cache_hit": false,
   "quota.cache_hit": false,
   "connection.received.bytes": 191,
@@ -48,20 +76,23 @@ const finalReportAttributesOkPost = `
 {
   "context.protocol": "tcp",
   "context.time": "*",
+  "context.reporter.uid": "",
   "mesh1.ip": "[1 1 1 1]",
   "source.ip": "[127 0 0 1]",
-  "source.port": "*",
   "target.uid": "POD222",
   "target.namespace": "XYZ222",
   "destination.ip": "[127 0 0 1]",
   "destination.port": "*",
+  "destination.uid": "",
+  "destination.namespace": "",
   "connection.mtls": false,
+  "origin.ip": "[127 0 0 1]",
   "check.cache_hit": false,
   "quota.cache_hit": false,
   "connection.received.bytes": 0,
   "connection.received.bytes_total": 191,
-  "connection.sent.bytes": 138,
-  "connection.sent.bytes_total": 138,
+  "connection.sent.bytes": "*",
+  "connection.sent.bytes_total": "*",
   "connection.duration": "*",
   "connection.id": "*",
   "connection.event": "close"
@@ -76,14 +107,11 @@ var expectedStats = map[string]int{
 	"tcp_mixer_filter.total_quota_calls":                 0,
 	"tcp_mixer_filter.total_remote_check_calls":          1,
 	"tcp_mixer_filter.total_remote_quota_calls":          0,
-	"tcp_mixer_filter.total_remote_report_calls":         2,
-	"tcp_mixer_filter.total_report_calls":                2,
+	"tcp_mixer_filter.total_remote_report_calls":         3,
+	"tcp_mixer_filter.total_report_calls":                3,
 }
 
 func TestTCPMixerFilterPeriodicalReport(t *testing.T) {
-	// https://github.com/istio/istio/issues/5696 skip all TCP tests.
-	t.Skip("issue https://github.com/istio/istio/issues/5696")
-
 	s := env.NewTestSetup(env.TCPMixerFilterPeriodicalReportTest, t)
 	env.SetTCPReportInterval(s.MfConfig().TCPServerConf, 2)
 	env.SetStatsUpdateInterval(s.MfConfig(), 1)
@@ -93,9 +121,6 @@ func TestTCPMixerFilterPeriodicalReport(t *testing.T) {
 		t.Fatalf("Failed to setup test: %v", err)
 	}
 	defer s.TearDown()
-
-	// Make sure tcp port is ready before starting the test.
-	env.WaitForPort(s.Ports().TCPProxyPort)
 
 	// Sends a request with parameter delay=3, so that server sleeps 3 seconds and sends response.
 	// Mixerclient sends a delta report after 2 seconds, and sends a final report after another 1
@@ -107,13 +132,10 @@ func TestTCPMixerFilterPeriodicalReport(t *testing.T) {
 		t.Errorf("Failed in request %s: %v", tag, err)
 	}
 
+	s.VerifyReport("openReport", openReportAttributesOkPost)
 	s.VerifyReport("deltaReport", deltaReportAttributesOkPost)
 	s.VerifyReport("finalReport", finalReportAttributesOkPost)
 
 	// Check stats for Check, Quota and report calls.
-	if respStats, err := s.WaitForStatsUpdateAndGetStats(2); err == nil {
-		s.VerifyStats(respStats, expectedStats)
-	} else {
-		t.Errorf("Failed to get stats from Envoy %v", err)
-	}
+	s.VerifyStats(expectedStats)
 }

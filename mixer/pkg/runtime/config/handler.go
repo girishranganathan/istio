@@ -31,13 +31,12 @@ type inferredTypesMap map[string]proto.Message
 
 // ValidateBuilder constructs and validates a builder.
 func ValidateBuilder(
-	handler *HandlerLegacy,
-	instances []*InstanceLegacy, templates map[string]*template.Info) (hb adapter.HandlerBuilder, err error) {
+	handler *HandlerStatic,
+	instances []*InstanceStatic, templates map[string]*template.Info) (hb adapter.HandlerBuilder, err error) {
 
 	// Do not assign the error to err directly, as this would overwrite the err returned by the inner function.
 	panicErr := safecall.Execute("factory.build", func() {
-		var inferredTypesByTemplates map[string]inferredTypesMap
-		inferredTypesByTemplates = groupInferTypesByTmpl(instances)
+		inferredTypesByTemplates := groupInferTypesByTmpl(instances)
 
 		// Adapter should always be present for a valid configuration (reference integrity should already be checked).
 		info := handler.Adapter
@@ -62,8 +61,8 @@ func ValidateBuilder(
 
 // BuildHandler instantiates a handler object using the passed in handler and instances configuration.
 func BuildHandler(
-	handler *HandlerLegacy,
-	instances []*InstanceLegacy,
+	handler *HandlerStatic,
+	instances []*InstanceStatic,
 	env adapter.Env, templates map[string]*template.Info) (h adapter.Handler, err error) {
 
 	var builder adapter.HandlerBuilder
@@ -122,7 +121,7 @@ func buildHandler(builder adapter.HandlerBuilder, env adapter.Env) (handler adap
 	return builder.Build(context.Background(), env)
 }
 
-func groupInferTypesByTmpl(instances []*InstanceLegacy) map[string]inferredTypesMap {
+func groupInferTypesByTmpl(instances []*InstanceStatic) map[string]inferredTypesMap {
 	typesByTemplate := make(map[string]inferredTypesMap)
 	for _, instance := range instances {
 		if _, exists := typesByTemplate[instance.Template.Name]; !exists {
@@ -138,7 +137,7 @@ func validateBuilder(
 	builder adapter.HandlerBuilder,
 	templates map[string]*template.Info,
 	inferredTypes map[string]inferredTypesMap,
-	handler *HandlerLegacy) (err error) {
+	handler *HandlerStatic) (err error) {
 	if builder == nil {
 		err = fmt.Errorf("nil builder from adapter: adapter='%s'", handler.Adapter.Name)
 		return

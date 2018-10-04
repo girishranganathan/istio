@@ -49,24 +49,24 @@ func (cr *store) ConfigDescriptor() model.ConfigDescriptor {
 	return cr.descriptor
 }
 
-func (cr *store) Get(typ, name, namespace string) (*model.Config, bool) {
+func (cr *store) Get(typ, name, namespace string) *model.Config {
 	_, ok := cr.data[typ]
 	if !ok {
-		return nil, false
+		return nil
 	}
 
 	ns, exists := cr.data[typ][namespace]
 	if !exists {
-		return nil, false
+		return nil
 	}
 
 	out, exists := ns.Load(name)
 	if !exists {
-		return nil, false
+		return nil
 	}
 	config := out.(model.Config)
 
-	return &config, true
+	return &config
 }
 
 func (cr *store) List(typ, namespace string) ([]model.Config, error) {
@@ -120,7 +120,7 @@ func (cr *store) Create(config model.Config) (string, error) {
 	if !ok {
 		return "", errors.New("unknown type")
 	}
-	if err := schema.Validate(config.Spec); err != nil {
+	if err := schema.Validate(config.Name, config.Namespace, config.Spec); err != nil {
 		return "", err
 	}
 	ns, exists := cr.data[typ][config.Namespace]
@@ -132,7 +132,14 @@ func (cr *store) Create(config model.Config) (string, error) {
 	_, exists = ns.Load(config.Name)
 
 	if !exists {
-		config.ResourceVersion = time.Now().String()
+		tnow := time.Now()
+		config.ResourceVersion = tnow.String()
+
+		// Set the creation timestamp, if not provided.
+		if config.CreationTimestamp.IsZero() {
+			config.CreationTimestamp = tnow
+		}
+
 		ns.Store(config.Name, config)
 		return config.ResourceVersion, nil
 	}
@@ -145,7 +152,7 @@ func (cr *store) Update(config model.Config) (string, error) {
 	if !ok {
 		return "", errors.New("unknown type")
 	}
-	if err := schema.Validate(config.Spec); err != nil {
+	if err := schema.Validate(config.Name, config.Namespace, config.Spec); err != nil {
 		return "", err
 	}
 

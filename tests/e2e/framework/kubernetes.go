@@ -43,6 +43,8 @@ const (
 	istioAddonsDir                 = "install/kubernetes/addons"
 	nonAuthInstallFile             = "istio.yaml"
 	authInstallFile                = "istio-auth.yaml"
+	nonAuthWithMCPInstallFile      = "istio-mcp.yaml"
+	authWithMCPInstallFile         = "istio-auth-mcp.yaml"
 	nonAuthInstallFileNamespace    = "istio-one-namespace.yaml"
 	authInstallFileNamespace       = "istio-one-namespace-auth.yaml"
 	mcNonAuthInstallFileNamespace  = "istio-multicluster.yaml"
@@ -57,13 +59,14 @@ const (
 	defaultSidecarInjectorFile     = "istio-sidecar-injector.yaml"
 	ingressCertsName               = "istio-ingress-certs"
 	maxDeploymentRolloutTime       = 480 * time.Second
-	mtlsExcludedServicesPattern    = "mtlsExcludedServices:\\s*\\[(.*)\\]"
+	maxValidationReadyCheckTime    = 30 * time.Second
 	helmServiceAccountFile         = "helm-service-account.yaml"
 	istioHelmInstallDir            = istioInstallDir + "/helm/istio"
 	caCertFileName                 = "samples/certs/ca-cert.pem"
 	caKeyFileName                  = "samples/certs/ca-key.pem"
 	rootCertFileName               = "samples/certs/root-cert.pem"
 	certChainFileName              = "samples/certs/cert-chain.pem"
+	helmInstallerName              = "helm"
 	// PrimaryCluster identifies the primary cluster
 	PrimaryCluster = "primary"
 	// RemoteCluster identifies the remote cluster
@@ -71,28 +74,32 @@ const (
 )
 
 var (
-	namespace    = flag.String("namespace", "", "Namespace to use for testing (empty to create/delete temporary one)")
-	mixerHub     = flag.String("mixer_hub", os.Getenv("HUB"), "Mixer hub")
-	mixerTag     = flag.String("mixer_tag", os.Getenv("TAG"), "Mixer tag")
-	pilotHub     = flag.String("pilot_hub", os.Getenv("HUB"), "Pilot hub")
-	pilotTag     = flag.String("pilot_tag", os.Getenv("TAG"), "Pilot tag")
-	proxyHub     = flag.String("proxy_hub", os.Getenv("HUB"), "Proxy hub")
-	proxyTag     = flag.String("proxy_tag", os.Getenv("TAG"), "Proxy tag")
-	caHub        = flag.String("ca_hub", os.Getenv("HUB"), "Ca hub")
-	caTag        = flag.String("ca_tag", os.Getenv("TAG"), "Ca tag")
-	galleyHub    = flag.String("galley_hub", os.Getenv("HUB"), "Galley hub")
-	galleyTag    = flag.String("galley_tag", os.Getenv("TAG"), "Galley tag")
-	authEnable   = flag.Bool("auth_enable", false, "Enable auth")
-	rbacEnable   = flag.Bool("rbac_enable", true, "Enable rbac")
-	localCluster = flag.Bool("use_local_cluster", false,
-		"Whether the cluster is local or not (i.e. the test is running within the cluster). If running on minikube, this should be set to true.")
-	skipSetup                = flag.Bool("skip_setup", false, "Skip namespace creation and istio cluster setup")
-	sidecarInjectorFile      = flag.String("sidecar_injector_file", defaultSidecarInjectorFile, "Sidecar injector yaml file")
-	clusterWide              = flag.Bool("cluster_wide", false, "Run cluster wide tests")
-	imagePullPolicy          = flag.String("image_pull_policy", "", "Specifies an override for the Docker image pull policy to be used")
-	multiClusterDir          = flag.String("cluster_registry_dir", "", "Directory name for the cluster registry config")
+	namespace          = flag.String("namespace", "", "Namespace to use for testing (empty to create/delete temporary one)")
+	mixerHub           = flag.String("mixer_hub", os.Getenv("HUB"), "Mixer hub")
+	mixerTag           = flag.String("mixer_tag", os.Getenv("TAG"), "Mixer tag")
+	pilotHub           = flag.String("pilot_hub", os.Getenv("HUB"), "Pilot hub")
+	pilotTag           = flag.String("pilot_tag", os.Getenv("TAG"), "Pilot tag")
+	proxyHub           = flag.String("proxy_hub", os.Getenv("HUB"), "Proxy hub")
+	proxyTag           = flag.String("proxy_tag", os.Getenv("TAG"), "Proxy tag")
+	caHub              = flag.String("ca_hub", os.Getenv("HUB"), "Ca hub")
+	caTag              = flag.String("ca_tag", os.Getenv("TAG"), "Ca tag")
+	galleyHub          = flag.String("galley_hub", os.Getenv("HUB"), "Galley hub")
+	galleyTag          = flag.String("galley_tag", os.Getenv("TAG"), "Galley tag")
+	sidecarInjectorHub = flag.String("sidecar_injector_hub", os.Getenv("HUB"), "Sidecar injector hub")
+	sidecarInjectorTag = flag.String("sidecar_injector_tag", os.Getenv("TAG"), "Sidecar injector tag")
+	authEnable         = flag.Bool("auth_enable", false, "Enable auth")
+	rbacEnable         = flag.Bool("rbac_enable", true, "Enable rbac")
+	localCluster       = flag.Bool("use_local_cluster", false,
+		"If true any LoadBalancer type services will be converted to a NodePort service during testing. If running on minikube, this should be set to true")
+	skipSetup           = flag.Bool("skip_setup", false, "Skip namespace creation and istio cluster setup")
+	sidecarInjectorFile = flag.String("sidecar_injector_file", defaultSidecarInjectorFile, "Sidecar injector yaml file")
+	clusterWide         = flag.Bool("cluster_wide", false, "If true Pilot/Mixer will observe all namespaces rather than just the testing namespace")
+	imagePullPolicy     = flag.String("image_pull_policy", "", "Specifies an override for the Docker image pull policy to be used")
+	multiClusterDir     = flag.String("cluster_registry_dir", "",
+		"Directory name for the cluster registry config. When provided a multicluster test to be run across two clusters.")
 	useGalleyConfigValidator = flag.Bool("use_galley_config_validator", false, "Use galley configuration validation webhook")
-	installer                = flag.String("installer", "kubectl", "Istio installer, default to kubectl, or helm ")
+	installer                = flag.String("installer", "kubectl", "Istio installer, default to kubectl, or helm")
+	useMCP                   = flag.Bool("use_mcp", false, "use MCP for configuring Istio components")
 
 	addons = []string{
 		"zipkin",
@@ -126,9 +133,6 @@ type KubeInfo struct {
 	RBACEnabled      bool
 	InstallAddons    bool
 
-	// Extra services to be excluded from MTLS
-	MTLSExcludedServices []string
-
 	// Istioctl installation
 	Istioctl *Istioctl
 	// App Manager
@@ -150,22 +154,16 @@ type KubeInfo struct {
 }
 
 func getClusterWideInstallFile() string {
-	const (
-		nonAuthInstallFile           = "istio.yaml"
-		authInstallFile              = "istio-auth.yaml"
-		nonAuthWithGalleyInstallFile = "istio-galley.yaml"
-		authWithGalleyInstallFile    = "istio-auth-galley.yaml"
-	)
 	var istioYaml string
 	if *authEnable {
-		if *useGalleyConfigValidator {
-			istioYaml = authWithGalleyInstallFile
+		if *useMCP {
+			istioYaml = authWithMCPInstallFile
 		} else {
 			istioYaml = authInstallFile
 		}
 	} else {
-		if *useGalleyConfigValidator {
-			istioYaml = nonAuthWithGalleyInstallFile
+		if *useMCP {
+			istioYaml = nonAuthWithMCPInstallFile
 		} else {
 			istioYaml = nonAuthInstallFile
 		}
@@ -184,7 +182,7 @@ func newKubeInfo(tmpDir, runID, baseVersion string) (*KubeInfo, error) {
 		}
 	}
 	yamlDir := filepath.Join(tmpDir, "yaml")
-	i, err := NewIstioctl(yamlDir, *namespace, *namespace, *proxyHub, *proxyTag, *imagePullPolicy)
+	i, err := NewIstioctl(yamlDir, *namespace, *proxyHub, *proxyTag, *imagePullPolicy, "")
 	if err != nil {
 		return nil, err
 	}
@@ -232,8 +230,16 @@ func newKubeInfo(tmpDir, runID, baseVersion string) (*KubeInfo, error) {
 		if remoteKubeClient, err = kube.CreateInterface(remoteKubeConfig); err != nil {
 			return nil, err
 		}
-
-		aRemote = NewAppManager(tmpDir, *namespace, i, remoteKubeConfig)
+		// Create Istioctl for remote using injectConfigMap on remote (not the same as master cluster's)
+		remoteI, err := NewIstioctl(yamlDir, *namespace, *proxyHub, *proxyTag, *imagePullPolicy, "istio-sidecar-injector")
+		if err != nil {
+			return nil, err
+		}
+		if baseVersion != "" {
+			remoteI.localPath = filepath.Join(releaseDir, "/bin/istioctl")
+			remoteI.defaultProxy = true
+		}
+		aRemote = NewAppManager(tmpDir, *namespace, remoteI, remoteKubeConfig)
 	}
 
 	a := NewAppManager(tmpDir, *namespace, i, kubeConfig)
@@ -270,6 +276,11 @@ func newKubeInfo(tmpDir, runID, baseVersion string) (*KubeInfo, error) {
 	}, nil
 }
 
+// IsClusterWide indicates whether or not the environment is configured for a cluster-wide deployment.
+func (k *KubeInfo) IsClusterWide() bool {
+	return *clusterWide
+}
+
 // IstioSystemNamespace returns the namespace used for the Istio system components.
 func (k *KubeInfo) IstioSystemNamespace() string {
 	if *clusterWide {
@@ -302,9 +313,9 @@ func (k *KubeInfo) Setup() error {
 	}
 
 	if !*skipSetup {
-		if *installer == "helm" {
+		if *installer == helmInstallerName {
 			// install helm tiller first
-			yamlDir := filepath.Join(istioInstallDir+"/helm", helmServiceAccountFile)
+			yamlDir := filepath.Join(istioInstallDir+"/"+helmInstallerName, helmServiceAccountFile)
 			baseHelmServiceAccountYaml := filepath.Join(k.ReleaseDir, yamlDir)
 			if err = k.deployTiller(baseHelmServiceAccountYaml); err != nil {
 				log.Error("Failed to deploy helm tiller.")
@@ -320,13 +331,6 @@ func (k *KubeInfo) Setup() error {
 			if err = k.deployIstio(); err != nil {
 				log.Error("Failed to deploy Istio.")
 				return err
-			}
-
-			if k.InstallAddons {
-				if err = k.deployAddons(); err != nil {
-					log.Error("Failed to deploy istio addons")
-					return err
-				}
 			}
 		}
 		// Create the ingress secret.
@@ -424,14 +428,18 @@ func (k *KubeInfo) doGetIngress(serviceName string, podLabel string, lock sync.L
 func (k *KubeInfo) Teardown() error {
 	log.Info("Cleaning up kubeInfo")
 
-	if *skipSetup || *skipCleanup {
+	if *skipSetup || *skipCleanup || os.Getenv("SKIP_CLEANUP") != "" {
 		return nil
 	}
-	if *installer == "helm" {
+	if *installer == helmInstallerName {
 		// clean up using helm
 		err := util.HelmDelete(k.Namespace)
 		if err != nil {
 			return nil
+		}
+
+		if err := util.DeleteNamespace(k.Namespace, k.KubeConfig); err != nil {
+			log.Errorf("Failed to delete namespace %s", k.Namespace)
 		}
 	} else {
 		if *useAutomaticInjection {
@@ -456,12 +464,6 @@ func (k *KubeInfo) Teardown() error {
 				log.Errorf("Failed to delete namespace %s", k.Namespace)
 				return err
 			}
-			if *multiClusterDir != "" {
-				if err := util.DeleteNamespace(k.Namespace, k.RemoteKubeConfig); err != nil {
-					log.Errorf("Failed to delete namespace %s on remote cluster", k.Namespace)
-					return err
-				}
-			}
 
 			// ClusterRoleBindings are not namespaced and need to be deleted separately
 			if _, err := util.Shell("kubectl get --kubeconfig=%s clusterrolebinding -o jsonpath={.items[*].metadata.name}"+
@@ -480,21 +482,39 @@ func (k *KubeInfo) Teardown() error {
 			}
 		}
 	}
+	if *multiClusterDir != "" {
+		if err := util.DeleteNamespace(k.Namespace, k.RemoteKubeConfig); err != nil {
+			log.Errorf("Failed to delete namespace %s on remote cluster", k.Namespace)
+		}
+	}
 
 	// confirm the namespace is deleted as it will cause future creation to fail
 	maxAttempts := 600
 	namespaceDeleted := false
+	validatingWebhookConfigurationDeleted := false
 	log.Infof("Deleting namespace %v", k.Namespace)
 	for attempts := 1; attempts <= maxAttempts; attempts++ {
 		namespaceDeleted, _ = util.NamespaceDeleted(k.Namespace, k.KubeConfig)
-		if namespaceDeleted {
+		// As validatingWebhookConfiguration "istio-galley" will
+		// be delete by kubernetes GC controller asynchronously,
+		// we need to ensure it's deleted before return.
+		// TODO: find a more general way as long term solution.
+		validatingWebhookConfigurationDeleted = util.ValidatingWebhookConfigurationDeleted("istio-galley", k.KubeConfig)
+
+		if namespaceDeleted && validatingWebhookConfigurationDeleted {
 			break
 		}
+
 		time.Sleep(1 * time.Second)
 	}
 
 	if !namespaceDeleted {
 		log.Errorf("Failed to delete namespace %s after %v seconds", k.Namespace, maxAttempts)
+		return nil
+	}
+
+	if !validatingWebhookConfigurationDeleted {
+		log.Errorf("Failed to delete validatingwebhookconfiguration istio-galley after %d seconds", maxAttempts)
 		return nil
 	}
 
@@ -638,6 +658,13 @@ func (k *KubeInfo) deployIstio() error {
 		return err
 	}
 
+	if k.InstallAddons {
+		if err := k.deployAddons(); err != nil {
+			log.Error("Failed to deploy istio addons")
+			return err
+		}
+	}
+
 	if *multiClusterDir != "" {
 		// Create namespace on any remote clusters
 		if err := util.CreateNamespace(k.Namespace, k.RemoteKubeConfig); err != nil {
@@ -645,7 +672,7 @@ func (k *KubeInfo) deployIstio() error {
 			return err
 		}
 		// Create the local secrets and configmap to start pilot
-		if err := util.CreateMultiClusterSecrets(k.Namespace, k.KubeClient, k.RemoteKubeConfig, k.KubeConfig); err != nil {
+		if err := util.CreateMultiClusterSecrets(k.Namespace, k.RemoteKubeConfig, k.KubeConfig); err != nil {
 			log.Errorf("Unable to create secrets on local cluster %s", err.Error())
 			return err
 		}
@@ -654,10 +681,8 @@ func (k *KubeInfo) deployIstio() error {
 			log.Infof("Failed to create Cacerts with namespace %s in remote cluster", k.Namespace)
 		}
 
-		yamlDir := filepath.Join(istioInstallDir, mcRemoteInstallFile)
-		baseIstioYaml := filepath.Join(k.ReleaseDir, yamlDir)
 		testIstioYaml := filepath.Join(k.TmpDir, "yaml", mcRemoteInstallFile)
-		if err := k.generateRemoteIstio(baseIstioYaml, testIstioYaml); err != nil {
+		if err := k.generateRemoteIstio(testIstioYaml, *useAutomaticInjection, *proxyHub, *proxyTag); err != nil {
 			log.Errorf("Generating Remote yaml %s failed", testIstioYaml)
 			return err
 		}
@@ -680,7 +705,36 @@ func (k *KubeInfo) deployIstio() error {
 		}
 	}
 
-	return util.CheckDeployments(k.Namespace, maxDeploymentRolloutTime, k.KubeConfig)
+	if err := util.CheckDeployments(k.Namespace, maxDeploymentRolloutTime, k.KubeConfig); err != nil {
+		return err
+	}
+
+	if *useGalleyConfigValidator {
+		timeout := time.Now().Add(maxValidationReadyCheckTime)
+		var validationReady bool
+		for time.Now().Before(timeout) {
+			if _, err := util.ShellSilent("kubectl get validatingwebhookconfiguration istio-galley --kubeconfig=%s", k.KubeConfig); err == nil {
+				validationReady = true
+				break
+			}
+		}
+		if !validationReady {
+			return errors.New("timeout waiting for validatingwebhookconfiguration istio-galley to be created")
+		}
+	}
+	return nil
+}
+
+// DeployTiller deploys tiller in Istio mesh or returns error
+func (k *KubeInfo) DeployTiller() error {
+	// no need to deploy tiller when Istio is deployed using helm as Tiller is already deployed as part of it.
+	if *installer == helmInstallerName {
+		return nil
+	}
+
+	yamlDir := filepath.Join(istioInstallDir+"/"+helmInstallerName, helmServiceAccountFile)
+	baseHelmServiceAccountYaml := filepath.Join(k.ReleaseDir, yamlDir)
+	return k.deployTiller(baseHelmServiceAccountYaml)
 }
 
 func (k *KubeInfo) deployTiller(yamlFileName string) error {
@@ -700,6 +754,14 @@ func (k *KubeInfo) deployTiller(yamlFileName string) error {
 }
 
 func (k *KubeInfo) deployIstioWithHelm() error {
+	yamlFileName := filepath.Join(istioInstallDir, helmInstallerName, "istio", "templates", "crds.yaml")
+	yamlFileName = filepath.Join(k.ReleaseDir, yamlFileName)
+
+	if err := util.KubeApply("kube-system", yamlFileName, k.KubeConfig); err != nil {
+		log.Errorf("Failed to apply %s", yamlFileName)
+		return err
+	}
+
 	// install istio helm chart, which includes addon
 	isSecurityOn := false
 	if *authEnable {
@@ -714,6 +776,11 @@ func (k *KubeInfo) deployIstioWithHelm() error {
 	if *useAutomaticInjection {
 		setValue += " --set sidecarInjectorWebhook.enabled=true"
 	}
+	if *useMCP {
+		setValue += " --set galley.enabled=true --set global.useMCP=true"
+	} else if *useGalleyConfigValidator {
+		setValue += " --set galley.enabled=true"
+	}
 	// hubs and tags replacement.
 	// Helm chart assumes hub and tag are the same among multiple istio components.
 	if *pilotHub != "" && *pilotTag != "" {
@@ -724,13 +791,11 @@ func (k *KubeInfo) deployIstioWithHelm() error {
 		setValue += " --set istiotesting.oneNameSpace=true"
 	}
 
-	// create the namespace
-	if err := util.CreateNamespace(k.Namespace, k.KubeConfig); err != nil {
-		log.Errorf("Unable to create namespace %s: %s", k.Namespace, err.Error())
-		return err
-	}
+	// CRDs installed ahead of time with 2.9.x
+	setValue += " --set global.crds=false"
 
-	// helm install dry run
+	// helm install dry run - dry run seems to have problems
+	// with CRDs even in 2.9.2, pre-install is not executed
 	workDir := filepath.Join(k.ReleaseDir, istioHelmInstallDir)
 	err := util.HelmInstallDryRun(workDir, k.Namespace, k.Namespace, setValue)
 	if err != nil {
@@ -815,27 +880,6 @@ func replacePattern(content []byte, src, dest string) []byte {
 	return content
 }
 
-func (k *KubeInfo) appendMtlsExcludedServices(content []byte) ([]byte, error) {
-	if !k.AuthEnabled || len(k.MTLSExcludedServices) == 0 {
-		// Nothing to do.
-		return content, nil
-	}
-
-	re := regexp.MustCompile(mtlsExcludedServicesPattern)
-	match := re.FindStringSubmatch(string(content))
-	if len(match) == 0 {
-		return nil, fmt.Errorf("failed to locate the mtlsExcludedServices section of the mesh config")
-	}
-
-	values := strings.Split(match[1], ",")
-	for _, v := range k.MTLSExcludedServices {
-		// Add surrounding quotes to the values.
-		values = append(values, fmt.Sprintf("\"%s\"", v))
-	}
-	newValue := fmt.Sprintf("mtlsExcludedServices: [%s]", strings.Join(values, ","))
-	return re.ReplaceAll(content, []byte(newValue)), nil
-}
-
 func (k *KubeInfo) generateIstio(src, dst string) error {
 	content, err := ioutil.ReadFile(src)
 	if err != nil {
@@ -851,20 +895,12 @@ func (k *KubeInfo) generateIstio(src, dst string) error {
 		content = replacePattern(content, "--configStoreURL=k8s://", "--configStoreURL=k8s://?"+vs.Encode())
 	}
 
-	// If mtlsExcludedServices is specified, replace it with the updated value
-	content, err = k.appendMtlsExcludedServices(content)
-	if err != nil {
-		log.Errorf("Failed to replace mtlsExcludedServices: %v", err)
-		return err
-	}
-
 	// Replace long refresh delays with short ones for the sake of tests.
 	content = replacePattern(content, "connectTimeout: 10s", "connectTimeout: 1s")
 	content = replacePattern(content, "drainDuration: 45s", "drainDuration: 2s")
 	content = replacePattern(content, "parentShutdownDuration: 1m0s", "parentShutdownDuration: 3s")
 
 	// A very flimsy and unreliable regexp to replace delays in ingress pod Spec
-	content = replacePattern(content, "'30s' #discoveryRefreshDelay", "'1s' #discoveryRefreshDelay")
 	content = replacePattern(content, "'10s' #connectTimeout", "'1s' #connectTimeout")
 	content = replacePattern(content, "'45s' #drainDuration", "'2s' #drainDuration")
 	content = replacePattern(content, "'1m0s' #parentShutdownDuration", "'3s' #parentShutdownDuration")
@@ -878,11 +914,23 @@ func (k *KubeInfo) generateIstio(src, dst string) error {
 		}
 		if *proxyHub != "" && *proxyTag != "" {
 			//Need to be updated when the string "proxy" is changed as the default image name
-			content = updateImage("proxy", *proxyHub, *proxyTag, content)
+			content = updateImage("proxy_init", *proxyHub, *proxyTag, content)
+		}
+		if *proxyHub != "" && *proxyTag != "" {
+			//Need to be updated when the string "proxy" is changed as the default image name
+			content = updateImage("proxyv2", *proxyHub, *proxyTag, content)
+		}
+		if *sidecarInjectorHub != "" && *sidecarInjectorTag != "" {
+			//Need to be updated when the string "proxy" is changed as the default image name
+			content = updateImage("sidecar_injector", *sidecarInjectorHub, *sidecarInjectorTag, content)
 		}
 		if *caHub != "" && *caTag != "" {
 			//Need to be updated when the string "citadel" is changed
 			content = updateImage("citadel", *caHub, *caTag, content)
+		}
+		if *galleyHub != "" && *galleyTag != "" {
+			//Need to be updated when the string "citadel" is changed
+			content = updateImage("galley", *galleyHub, *galleyTag, content)
 		}
 		if *imagePullPolicy != "" {
 			content = updateImagePullPolicy(*imagePullPolicy, content)

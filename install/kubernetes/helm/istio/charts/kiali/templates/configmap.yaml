@@ -9,7 +9,8 @@ data:
   config.yaml: |
     server:
       port: 20001
-      static_content_root_directory: /opt/kiali/console
-      credentials:
-        username: {{ .Values.dashboard.username }}
-        password: {{ .Values.dashboard.password }}
+    external_services:
+      jaeger:
+        url: {{ .Values.dashboard.jaegerURL }}
+      grafana:
+        url: {{ .Values.dashboard.grafanaURL }}

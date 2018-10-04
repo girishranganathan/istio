@@ -1,4 +1,4 @@
-// Copyright 2017 Istio Authors.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,6 +47,14 @@ var (
 	mr2 = &monitoredres.MonitoredResource{
 		Type:   "Star Trek",
 		Labels: map[string]string{"ship": "USS Enterprise (NCC-1701-D)"},
+	}
+	m3 = &metric.Metric{
+		Type:   "Star Trek",
+		Labels: map[string]string{"series": "Star Trek: Deep Space Nine", "captain": "Benjamin Sisko"},
+	}
+	mr3 = &monitoredres.MonitoredResource{
+		Type:   "Star Trek",
+		Labels: map[string]string{"ship": "USS Defiant (NX-74205)"},
 	}
 )
 

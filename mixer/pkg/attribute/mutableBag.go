@@ -47,7 +47,7 @@ var mutableBags = sync.Pool{
 	},
 }
 
-var scope = log.RegisterScope("attributes", "Attribute-related messsages.", 0)
+var scope = log.RegisterScope("attributes", "Attribute-related messages.", 0)
 
 // GetMutableBag returns an initialized bag.
 //
@@ -67,12 +67,21 @@ func GetMutableBag(parent Bag) *MutableBag {
 	return mb
 }
 
-// GetFakeMutableBagForTesting returns a Mutable bag based on the specified map
+// GetMutableBagForTesting returns a Mutable bag based on the specified map
 // Use this function only for testing purposes.
-func GetFakeMutableBagForTesting(v map[string]interface{}) *MutableBag {
+func GetMutableBagForTesting(v map[string]interface{}) *MutableBag {
 	m := GetMutableBag(nil)
 	m.values = v
 	return m
+}
+
+// GetProtoForTesting returns a CompressedAttributes struct based on the specified map
+// Use this function only for testing purposes.
+func GetProtoForTesting(v map[string]interface{}) *mixerpb.CompressedAttributes {
+	b := GetMutableBagForTesting(v)
+	var ca mixerpb.CompressedAttributes
+	b.ToProto(&ca, nil, 0)
+	return &ca
 }
 
 // CopyBag makes a deep copy of a bag.
@@ -132,6 +141,15 @@ func (mb *MutableBag) Get(name string) (interface{}, bool) {
 	return r, b
 }
 
+// Contains returns true if the key is present in the bag.
+func (mb *MutableBag) Contains(key string) bool {
+	if _, found := mb.values[key]; found {
+		return true
+	}
+
+	return mb.parent.Contains(key)
+}
+
 // Names returns the names of all the attributes known to this bag.
 func (mb *MutableBag) Names() []string {
 	if mb == nil {
@@ -185,16 +203,9 @@ func (mb *MutableBag) Reset() {
 // Note that this does a 'shallow' merge. Only the value defined explicitly in the
 // mutable bags themselves, and not in any of their parents, are considered.
 func (mb *MutableBag) Merge(bag *MutableBag) {
-	// get the known symbols for the target bag
-	names := make(map[string]bool)
-	for _, name := range mb.Names() {
-		names[name] = true
-	}
-
 	for k, v := range bag.values {
 		// the input bags cannot override values already in the destination bag
-		_, found := names[k]
-		if !found {
+		if !mb.Contains(k) {
 			mb.values[k] = copyValue(v)
 		}
 	}
@@ -221,6 +232,12 @@ func (mb *MutableBag) ToProto(output *mixerpb.CompressedAttributes, globalDict m
 				output.Int64S = make(map[int32]int64)
 			}
 			output.Int64S[index] = t
+
+		case int:
+			if output.Int64S == nil {
+				output.Int64S = make(map[int32]int64)
+			}
+			output.Int64S[index] = int64(t)
 
 		case float64:
 			if output.Doubles == nil {
@@ -262,6 +279,9 @@ func (mb *MutableBag) ToProto(output *mixerpb.CompressedAttributes, globalDict m
 				output.StringMaps = make(map[int32]mixerpb.StringMap)
 			}
 			output.StringMaps[index] = mixerpb.StringMap{Entries: sm}
+
+		default:
+			panic(fmt.Errorf("cannot convert value:%v of type:%T", v, v))
 		}
 	}
 
@@ -331,9 +351,9 @@ func (mb *MutableBag) UpdateBagFromProto(attrs *mixerpb.CompressedAttributes, gl
 	for k, v := range attrs.Strings {
 		name, e = lookup(k, e, globalWordList, messageWordList)
 		value, e = lookup(v, e, globalWordList, messageWordList)
-		if err := mb.insertProtoAttr(name, value, seen, lg); err != nil {
-			return err
-		}
+
+		// this call cannot fail, given that this is the first map we're iterating through
+		_ = mb.insertProtoAttr(name, value, seen, lg)
 	}
 
 	lg("  setting int64 attributes:")

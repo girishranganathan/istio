@@ -15,27 +15,32 @@
 package v2
 
 import (
-	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	xdsapi "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	ads "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2"
+	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
 
-	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/istio/pilot/pkg/model"
-	"istio.io/istio/pilot/pkg/networking/core/v1alpha3"
+	"istio.io/istio/pilot/pkg/networking/core"
+	"istio.io/istio/pkg/features/pilot"
 )
 
 var (
 	// Failsafe to implement periodic refresh, in case events or cache invalidation fail.
 	// Disabled by default.
-	periodicRefreshDuration = 60 * time.Second
+	periodicRefreshDuration = 0 * time.Second
 
-	versionMutex sync.Mutex
-	// version is update by registry events.
-	version = time.Now()
+	versionMutex sync.RWMutex
+
+	// version is the timestamp of the last registry event.
+	version = "0"
+
+	periodicRefreshMetrics = 10 * time.Second
 )
 
 const (
@@ -56,45 +61,57 @@ const (
 // DiscoveryServer is Pilot's gRPC implementation for Envoy's v2 xds APIs
 type DiscoveryServer struct {
 	// env is the model environment.
-	env model.Environment
+	env *model.Environment
 
 	// MemRegistry is used for debug and load testing, allow adding services. Visible for testing.
 	MemRegistry *MemServiceDiscovery
 
 	// ConfigGenerator is responsible for generating data plane configuration using Istio networking
 	// APIs and service registry info
-	ConfigGenerator *v1alpha3.ConfigGeneratorImpl
+	ConfigGenerator core.ConfigGenerator
 
-	// The next fields are updated by v2 discovery, based on config change events (currently
-	// the global invalidation). They are computed once - will not change. The new alpha3
-	// API should use this instead of directly accessing ServiceDiscovery or IstioConfigStore.
-	modelMutex      sync.RWMutex
-	services        []*model.Service
-	virtualServices []*networking.VirtualService
-	// Temp: the code in alpha3 should use VirtualService directly
-	virtualServiceConfigs []model.Config
-	//TODO: gateways              []*networking.Gateway
+	// ConfigController provides readiness info (if initial sync is complete)
+	ConfigController model.ConfigStoreCache
+
+	rateLimiter         *rate.Limiter
+	concurrentPushLimit chan struct{}
+
+	// DebugConfigs controls saving snapshots of configs for /debug/adsz.
+	// Defaults to false, can be enabled with PILOT_DEBUG_ADSZ_CONFIG=1
+	DebugConfigs bool
+}
+
+func intEnv(envVal string, def int) int {
+	if len(envVal) == 0 {
+		return def
+	}
+	n, err := strconv.Atoi(envVal)
+	if err == nil && n > 0 {
+		return n
+	}
+	return def
 }
 
 // NewDiscoveryServer creates DiscoveryServer that sources data from Pilot's internal mesh data structures
-func NewDiscoveryServer(env model.Environment, generator *v1alpha3.ConfigGeneratorImpl) *DiscoveryServer {
+func NewDiscoveryServer(env *model.Environment, generator core.ConfigGenerator) *DiscoveryServer {
 	out := &DiscoveryServer{
-		env:             env,
-		ConfigGenerator: generator,
+		env:                 env,
+		ConfigGenerator:     generator,
+		concurrentPushLimit: make(chan struct{}, 20), // TODO(hzxuzhonghu): support configuration
 	}
+	env.PushContext = model.NewPushContext()
 
-	envOverride := os.Getenv("V2_REFRESH")
-	if len(envOverride) > 0 {
-		var err error
-		periodicRefreshDuration, err = time.ParseDuration(envOverride)
-		if err != nil {
-			adsLog.Warn("Invalid value for V2_REFRESH")
-			periodicRefreshDuration = 0 // this is also he default, but setting it explicitly
-		}
-	}
-	if periodicRefreshDuration > 0 {
-		go periodicRefresh()
-	}
+	go out.periodicRefresh()
+
+	go out.periodicRefreshMetrics()
+
+	out.DebugConfigs = pilot.DebugConfigs
+
+	pushThrottle := intEnv(pilot.PushThrottle, 10)
+	pushBurst := intEnv(pilot.PushBurst, 100)
+
+	adsLog.Infof("Starting ADS server with rateLimiter=%d burst=%d", pushThrottle, pushBurst)
+	out.rateLimiter = rate.NewLimiter(rate.Limit(pushThrottle), pushBurst)
 
 	return out
 }
@@ -110,23 +127,42 @@ func (s *DiscoveryServer) Register(rpcs *grpc.Server) {
 // Singleton, refresh the cache - may not be needed if events work properly, just a failsafe
 // ( will be removed after change detection is implemented, to double check all changes are
 // captured)
-func periodicRefresh() {
+func (s *DiscoveryServer) periodicRefresh() {
+	envOverride := pilot.RefreshDuration
+	if len(envOverride) > 0 {
+		var err error
+		periodicRefreshDuration, err = time.ParseDuration(envOverride)
+		if err != nil {
+			adsLog.Warn("Invalid value for V2_REFRESH")
+		}
+	}
+	if periodicRefreshDuration == 0 {
+		return
+	}
 	ticker := time.NewTicker(periodicRefreshDuration)
 	defer ticker.Stop()
 	for range ticker.C {
-		PushAll()
+		adsLog.Infof("ADS: periodic push of envoy configs %s", versionInfo())
+		s.AdsPushAll(versionInfo())
 	}
 }
 
-// PushAll implements old style invalidation, generated when any rule or endpoint changes.
-// Primary code path is from v1 discoveryService.clearCache(), which is added as a handler
-// to the model ConfigStorageCache and Controller.
-func PushAll() {
-	versionMutex.Lock()
-	version = time.Now()
-	versionMutex.Unlock()
-
-	adsPushAll()
+// Push metrics are updated periodically (10s default)
+func (s *DiscoveryServer) periodicRefreshMetrics() {
+	ticker := time.NewTicker(periodicRefreshMetrics)
+	defer ticker.Stop()
+	for range ticker.C {
+		push := s.env.PushContext
+		if push.End != timeZero {
+			model.LastPushStatus = push
+		}
+		push.UpdateMetrics()
+		// TODO: env to customize
+		//if time.Since(push.Start) > 30*time.Second {
+		// Reset the stats, some errors may still be stale.
+		//s.env.PushContext = model.NewPushContext()
+		//}
+	}
 }
 
 // ClearCacheFunc returns a function that invalidates v2 caches and triggers a push.
@@ -135,46 +171,48 @@ func PushAll() {
 // This is currently called from v1 and has attenuation/throttling.
 func (s *DiscoveryServer) ClearCacheFunc() func() {
 	return func() {
-		s.updateModel()
-
-		s.modelMutex.RLock()
-		adsLog.Infof("XDS: Registry event, pushing. Services: %d, "+
-			"VirtualServices: %d, ConnectedEndpoints: %d", len(s.services), len(s.virtualServices), edsClientCount())
-		monServices.Set(float64(len(s.services)))
-		monVServices.Set(float64(len(s.virtualServices)))
-		s.modelMutex.RUnlock()
-
-		PushAll()
-	}
-}
-
-func (s *DiscoveryServer) updateModel() {
-	s.modelMutex.Lock()
-	defer s.modelMutex.Unlock()
-	services, err := s.env.Services()
-	if err != nil {
-		adsLog.Errorf("XDS: failed to update services %v", err)
-	} else {
-		s.services = services
-	}
-	vservices, err := s.env.List(model.VirtualService.Type, model.NamespaceAll)
-	if err != nil {
-		adsLog.Errorf("XDS: failed to update virtual services %v", err)
-	} else {
-		s.virtualServiceConfigs = vservices
-		s.virtualServices = make([]*networking.VirtualService, 0, len(vservices))
-		for _, ss := range vservices {
-			s.virtualServices = append(s.virtualServices, ss.Spec.(*networking.VirtualService))
+		// Reset the status during the push.
+		//afterPush := true
+		if s.env.PushContext != nil {
+			s.env.PushContext.OnConfigChange()
 		}
+		// PushContext is reset after a config change. Previous status is
+		// saved.
+		t0 := time.Now()
+		push := model.NewPushContext()
+		err := push.InitContext(s.env)
+		if err != nil {
+			adsLog.Errorf("XDS: failed to update services %v", err)
+			// We can't push if we can't read the data - stick with previous version.
+			pushContextErrors.Inc()
+			return
+		}
+
+		if err = s.ConfigGenerator.BuildSharedPushState(s.env, push); err != nil {
+			adsLog.Errorf("XDS: Failed to rebuild share state in configgen: %v", err)
+			return
+		}
+
+		s.env.PushContext = push
+		versionLocal := time.Now().Format(time.RFC3339)
+		initContextTime := time.Since(t0)
+		adsLog.Debugf("InitContext %v for push took %s", versionLocal, initContextTime)
+
+		// TODO: propagate K8S version and use it instead
+		versionMutex.Lock()
+		version = versionLocal
+		versionMutex.Unlock()
+
+		go s.AdsPushAll(versionLocal)
 	}
 }
 
 func nonce() string {
-	return time.Now().String()
+	return uuid.New().String()
 }
 
 func versionInfo() string {
-	versionMutex.Lock()
-	defer versionMutex.Unlock()
-	return version.String()
+	versionMutex.RLock()
+	defer versionMutex.RUnlock()
+	return version
 }

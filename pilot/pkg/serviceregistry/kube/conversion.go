@@ -28,17 +28,6 @@ import (
 	"istio.io/istio/pilot/pkg/model"
 )
 
-type kubeServiceNode struct {
-	// PodName Specifies the name of the POD
-	PodName string
-
-	// Namespace specifies the name of the namespace the pod belongs to
-	Namespace string
-
-	// Domain specifies the pod's domain
-	Domain string
-}
-
 const (
 	// IngressClassAnnotation is the annotation on ingress resources for the class of controllers
 	// responsible for it
@@ -48,12 +37,14 @@ const (
 	// this service on the VMs
 	KubeServiceAccountsOnVMAnnotation = "alpha.istio.io/kubernetes-serviceaccounts"
 
-	// CanonicalServiceAccountsOnVMAnnotation is to specify the non-Kubernetes service accounts that
-	// are allowed to run this service on the VMs
-	CanonicalServiceAccountsOnVMAnnotation = "alpha.istio.io/canonical-serviceaccounts"
+	// CanonicalServiceAccountsAnnotation is to specify the non-Kubernetes service accounts that
+	// are allowed to run this service.
+	CanonicalServiceAccountsAnnotation = "alpha.istio.io/canonical-serviceaccounts"
 
-	// IstioURIPrefix is the URI prefix in the Istio service account scheme
-	IstioURIPrefix = "spiffe"
+	// istioURIPrefix is the URI prefix in the Istio service account scheme
+	istioURIPrefix = "spiffe"
+
+	managementPortPrefix = "mgmt-"
 )
 
 func convertLabels(obj meta_v1.ObjectMeta) model.Labels {
@@ -73,24 +64,21 @@ func convertPort(port v1.ServicePort, obj meta_v1.ObjectMeta) *model.Port {
 }
 
 func convertService(svc v1.Service, domainSuffix string) *model.Service {
-	addr, external := "", ""
+	addr, external := model.UnspecifiedIP, ""
 	if svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != v1.ClusterIPNone {
 		addr = svc.Spec.ClusterIP
 	}
 
 	resolution := model.ClientSideLB
 	meshExternal := false
-	loadBalancingDisabled := false
 
 	if svc.Spec.Type == v1.ServiceTypeExternalName && svc.Spec.ExternalName != "" {
 		external = svc.Spec.ExternalName
 		resolution = model.Passthrough
 		meshExternal = true
-		loadBalancingDisabled = true
 	}
 
-	if addr == "" && external == "" { // headless services should not be load balanced
-		loadBalancingDisabled = true
+	if addr == model.UnspecifiedIP && external == "" { // headless services should not be load balanced
 		resolution = model.Passthrough
 	}
 
@@ -101,9 +89,9 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 
 	serviceaccounts := make([]string, 0)
 	if svc.Annotations != nil {
-		if svc.Annotations[CanonicalServiceAccountsOnVMAnnotation] != "" {
-			for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsOnVMAnnotation], ",") {
-				serviceaccounts = append(serviceaccounts, canonicalToIstioServiceAccount(csa))
+		if svc.Annotations[CanonicalServiceAccountsAnnotation] != "" {
+			for _, csa := range strings.Split(svc.Annotations[CanonicalServiceAccountsAnnotation], ",") {
+				serviceaccounts = append(serviceaccounts, csa)
 			}
 		}
 		if svc.Annotations[KubeServiceAccountsOnVMAnnotation] != "" {
@@ -115,14 +103,18 @@ func convertService(svc v1.Service, domainSuffix string) *model.Service {
 	sort.Sort(sort.StringSlice(serviceaccounts))
 
 	return &model.Service{
-		Hostname:              serviceHostname(svc.Name, svc.Namespace, domainSuffix),
-		Ports:                 ports,
-		Address:               addr,
-		ExternalName:          model.Hostname(external),
-		ServiceAccounts:       serviceaccounts,
-		LoadBalancingDisabled: loadBalancingDisabled,
-		MeshExternal:          meshExternal,
-		Resolution:            resolution,
+		Hostname:        serviceHostname(svc.Name, svc.Namespace, domainSuffix),
+		Ports:           ports,
+		Address:         addr,
+		ServiceAccounts: serviceaccounts,
+		MeshExternal:    meshExternal,
+		Resolution:      resolution,
+		CreationTime:    svc.CreationTimestamp.Time,
+		Attributes: model.ServiceAttributes{
+			Name:      svc.Name,
+			Namespace: svc.Namespace,
+			UID:       fmt.Sprintf("istio://%s/services/%s", svc.Namespace, svc.Name),
+		},
 	}
 }
 
@@ -131,14 +123,9 @@ func serviceHostname(name, namespace, domainSuffix string) model.Hostname {
 	return model.Hostname(fmt.Sprintf("%s.%s.svc.%s", name, namespace, domainSuffix))
 }
 
-// canonicalToIstioServiceAccount converts a Canonical service account to an Istio service account
-func canonicalToIstioServiceAccount(saname string) string {
-	return fmt.Sprintf("%v://%v", IstioURIPrefix, saname)
-}
-
 // kubeToIstioServiceAccount converts a K8s service account to an Istio service account
 func kubeToIstioServiceAccount(saname string, ns string, domain string) string {
-	return fmt.Sprintf("%v://%v/ns/%v/sa/%v", IstioURIPrefix, domain, ns, saname)
+	return fmt.Sprintf("%v://%v/ns/%v/sa/%v", istioURIPrefix, domain, ns, saname)
 }
 
 // KeyFunc is the internal API key function that returns "namespace"/"name" or
@@ -152,59 +139,13 @@ func KeyFunc(name, namespace string) string {
 
 // parseHostname extracts service name and namespace from the service hostname
 func parseHostname(hostname model.Hostname) (name string, namespace string, err error) {
-	parts := strings.Split(hostname.String(), ".")
+	parts := strings.Split(string(hostname), ".")
 	if len(parts) < 2 {
 		err = fmt.Errorf("missing service name and namespace from the service hostname %q", hostname)
 		return
 	}
 	name = parts[0]
 	namespace = parts[1]
-	return
-}
-
-// parsePodID extracts POD name and namespace from the service node ID
-func parsePodID(nodeID string) (podname string, namespace string, err error) {
-	parts := strings.Split(nodeID, ".")
-	if len(parts) != 2 {
-		err = fmt.Errorf("invalid ID %q. Should be <pod name>.<namespace>", nodeID)
-		return
-	}
-	podname = parts[0]
-	namespace = parts[1]
-	return
-}
-
-// parseDomain extracts the service node's domain
-func parseDomain(nodeDomain string) (namespace string, err error) {
-	parts := strings.Split(nodeDomain, ".")
-	if len(parts) != 4 {
-		err = fmt.Errorf("invalid node domain format %q. Should be <namespace>.svc.cluster.local", nodeDomain)
-		return
-	}
-	if parts[1] != "svc" || parts[2] != "cluster" || parts[3] != "local" {
-		err = fmt.Errorf("invalid node domain %q. Should be <namespace>.svc.cluster.local", nodeDomain)
-		return
-	}
-	namespace = parts[0]
-	return
-}
-
-func parseKubeServiceNode(IPAddress string, node *model.Proxy, kubeNodes map[string]*kubeServiceNode) (err error) {
-	podname, namespace, err := parsePodID(node.ID)
-	if err != nil {
-		return
-	}
-	namespace1, err := parseDomain(node.Domain)
-	if err != nil {
-		return
-	}
-	if namespace != namespace1 {
-		err = fmt.Errorf("namespace in ID %q must be equal to that in domain %q", node.ID, node.Domain)
-	}
-	kubeNodes[IPAddress] = &kubeServiceNode{
-		PodName:   podname,
-		Namespace: namespace,
-		Domain:    node.Domain}
 	return
 }
 
@@ -235,33 +176,33 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 
 	var protocol model.Protocol
 	var portVal intstr.IntOrString
-	var port int
 
-	// Only one type of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
-	if handler.HTTPGet != nil {
+	// Only two types of handler is allowed by Kubernetes (HTTPGet or TCPSocket)
+	switch {
+	case handler.HTTPGet != nil:
 		portVal = handler.HTTPGet.Port
 		protocol = model.ProtocolHTTP
-	} else if handler.TCPSocket != nil {
+	case handler.TCPSocket != nil:
 		portVal = handler.TCPSocket.Port
 		protocol = model.ProtocolTCP
-	} else {
+	default:
 		return nil, nil
 	}
 
 	switch portVal.Type {
 	case intstr.Int:
-		port = portVal.IntValue()
+		port := portVal.IntValue()
 		return &model.Port{
-			Name:     "mgmt-" + strconv.Itoa(port),
+			Name:     managementPortPrefix + strconv.Itoa(port),
 			Port:     port,
 			Protocol: protocol,
 		}, nil
 	case intstr.String:
 		for _, named := range c.Ports {
 			if named.Name == portVal.String() {
-				port = int(named.ContainerPort)
+				port := int(named.ContainerPort)
 				return &model.Port{
-					Name:     "mgmt-" + strconv.Itoa(port),
+					Name:     managementPortPrefix + strconv.Itoa(port),
 					Port:     port,
 					Protocol: protocol,
 				}, nil
@@ -269,7 +210,7 @@ func convertProbePort(c v1.Container, handler *v1.Handler) (*model.Port, error) 
 		}
 		return nil, fmt.Errorf("missing named port %q", portVal)
 	default:
-		return nil, fmt.Errorf("incorrect port type %q", portVal)
+		return nil, fmt.Errorf("incorrect port type %q", portVal.Type)
 	}
 }
 

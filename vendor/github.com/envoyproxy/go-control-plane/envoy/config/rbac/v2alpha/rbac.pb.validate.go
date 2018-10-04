@@ -239,6 +239,30 @@ func (m *Permission) Validate() error {
 			}
 		}
 
+	case *Permission_Metadata:
+
+		if v, ok := interface{}(m.GetMetadata()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PermissionValidationError{
+					Field:  "Metadata",
+					Reason: "embedded message failed validation",
+					Cause:  err,
+				}
+			}
+		}
+
+	case *Permission_NotRule:
+
+		if v, ok := interface{}(m.GetNotRule()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PermissionValidationError{
+					Field:  "NotRule",
+					Reason: "embedded message failed validation",
+					Cause:  err,
+				}
+			}
+		}
+
 	default:
 		return PermissionValidationError{
 			Field:  "Rule",
@@ -353,6 +377,30 @@ func (m *Principal) Validate() error {
 			if err := v.Validate(); err != nil {
 				return PrincipalValidationError{
 					Field:  "Header",
+					Reason: "embedded message failed validation",
+					Cause:  err,
+				}
+			}
+		}
+
+	case *Principal_Metadata:
+
+		if v, ok := interface{}(m.GetMetadata()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PrincipalValidationError{
+					Field:  "Metadata",
+					Reason: "embedded message failed validation",
+					Cause:  err,
+				}
+			}
+		}
+
+	case *Principal_NotId:
+
+		if v, ok := interface{}(m.GetNotId()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PrincipalValidationError{
+					Field:  "NotId",
 					Reason: "embedded message failed validation",
 					Cause:  err,
 				}
@@ -537,7 +585,15 @@ func (m *Principal_Authenticated) Validate() error {
 		return nil
 	}
 
-	// no validation rules for Name
+	if v, ok := interface{}(m.GetPrincipalName()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return Principal_AuthenticatedValidationError{
+				Field:  "PrincipalName",
+				Reason: "embedded message failed validation",
+				Cause:  err,
+			}
+		}
+	}
 
 	return nil
 }

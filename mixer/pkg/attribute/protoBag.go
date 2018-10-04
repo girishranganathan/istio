@@ -54,21 +54,23 @@ type ProtoBag struct {
 
 // NewProtoBag creates a new proto-based attribute bag.
 func NewProtoBag(proto *mixerpb.CompressedAttributes, globalDict map[string]int32, globalWordList []string) *ProtoBag {
-	scope.Debugf("Creating bag with attributes: %v", proto)
-
 	// build the message-level dictionary
 	d := make(map[string]int32, len(proto.Words))
 	for i, name := range proto.Words {
 		d[name] = slotToIndex(i)
 	}
 
-	return &ProtoBag{
+	out := &ProtoBag{
 		proto:           proto,
 		globalDict:      globalDict,
 		globalWordList:  globalWordList,
 		messageDict:     d,
 		referencedAttrs: make(map[attributeRef]mixerpb.ReferencedAttributes_Condition, 16),
 	}
+
+	scope.Debugf("Creating bag with attributes: %v", out)
+
+	return out
 }
 
 // StringMap wraps a map[string]string and reference counts it
@@ -121,8 +123,8 @@ func (pb *ProtoBag) Get(name string) (interface{}, bool) {
 }
 
 // GetReferencedAttributes returns the set of attributes that have been referenced through this bag.
-func (pb *ProtoBag) GetReferencedAttributes(globalDict map[string]int32, globalWordCount int) mixerpb.ReferencedAttributes {
-	output := mixerpb.ReferencedAttributes{}
+func (pb *ProtoBag) GetReferencedAttributes(globalDict map[string]int32, globalWordCount int) *mixerpb.ReferencedAttributes {
+	output := &mixerpb.ReferencedAttributes{}
 
 	ds := newDictState(globalDict, globalWordCount)
 
@@ -312,6 +314,48 @@ func (pb *ProtoBag) convertStringMap(s map[int32]int32) (map[string]string, erro
 	}
 
 	return d, nil
+}
+
+// Contains returns true if protobag contains this key.
+func (pb *ProtoBag) Contains(key string) bool {
+	idx, found := pb.getIndex(key)
+	if !found {
+		return false
+	}
+
+	if _, ok := pb.proto.Strings[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.StringMaps[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Int64S[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Doubles[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Bools[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Timestamps[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Durations[idx]; ok {
+		return true
+	}
+
+	if _, ok := pb.proto.Bytes[idx]; ok {
+		return true
+	}
+
+	return false
 }
 
 // Names returns the names of all the attributes known to this bag.

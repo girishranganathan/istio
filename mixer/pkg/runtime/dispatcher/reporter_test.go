@@ -25,12 +25,12 @@ import (
 func TestReporterPool(t *testing.T) {
 	ctx := context.TODO()
 
-	d := New("", nil, false)
+	d := New(nil, false)
 
 	// Prime the pool
 	reporters := make([]*reporter, 100)
 	for i := 0; i < 100; i++ {
-		r := d.getReporter(nil)
+		r := d.getReporter(context.TODO())
 		reporters[i] = r
 	}
 	for i := 0; i < 100; i++ {

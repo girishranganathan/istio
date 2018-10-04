@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"istio.io/istio/pilot/pkg/model"
+	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/tests/util"
 )
 
@@ -26,8 +27,14 @@ func TestLDS(t *testing.T) {
 	initLocalPilotTestEnv(t)
 
 	t.Run("sidecar", func(t *testing.T) {
-		ldsr := connectADS(t, util.MockPilotGrpcAddr)
-		sendLDSReq(t, sidecarId(app3Ip, "app3"), ldsr)
+		ldsr, err := connectADS(util.MockPilotGrpcAddr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sendLDSReq(sidecarId(app3Ip, "app3"), ldsr)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		res, err := ldsr.Recv()
 		if err != nil {
@@ -36,7 +43,7 @@ func TestLDS(t *testing.T) {
 		}
 
 		strResponse, _ := model.ToJSONWithIndent(res, " ")
-		_ = ioutil.WriteFile(util.IstioOut+"/ldsv2_sidecar.json", []byte(strResponse), 0644)
+		_ = ioutil.WriteFile(env.IstioOut+"/ldsv2_sidecar.json", []byte(strResponse), 0644)
 
 		if len(res.Resources) == 0 {
 			t.Fatal("No response")
@@ -45,18 +52,23 @@ func TestLDS(t *testing.T) {
 
 	// 'router' or 'gateway' type of listener
 	t.Run("gateway", func(t *testing.T) {
-		ldsr := connectADS(t, util.MockPilotGrpcAddr)
-		sendLDSReq(t, gatewayId(gatewayIP), ldsr)
+		ldsr, err := connectADS(util.MockPilotGrpcAddr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = sendLDSReq(gatewayId(gatewayIP), ldsr)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		res, err := ldsr.Recv()
 		if err != nil {
 			t.Fatal("Failed to receive LDS", err)
-			return
 		}
 
 		strResponse, _ := model.ToJSONWithIndent(res, " ")
 
-		_ = ioutil.WriteFile(util.IstioOut+"/ldsv2_gateway.json", []byte(strResponse), 0644)
+		_ = ioutil.WriteFile(env.IstioOut+"/ldsv2_gateway.json", []byte(strResponse), 0644)
 
 		if len(res.Resources) == 0 {
 			t.Fatal("No response")
@@ -64,8 +76,15 @@ func TestLDS(t *testing.T) {
 	})
 
 	t.Run("ingress", func(t *testing.T) {
-		ldsr := connectADS(t, util.MockPilotGrpcAddr)
-		sendLDSReq(t, ingressId(ingressIP), ldsr)
+		ldsr, err := connectADS(util.MockPilotGrpcAddr)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = sendLDSReq(ingressId(ingressIP), ldsr)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		res, err := ldsr.Recv()
 		if err != nil {
@@ -75,7 +94,7 @@ func TestLDS(t *testing.T) {
 
 		strResponse, _ := model.ToJSONWithIndent(res, " ")
 
-		_ = ioutil.WriteFile(util.IstioOut+"/ads_lds_ingress.json", []byte(strResponse), 0644)
+		_ = ioutil.WriteFile(env.IstioOut+"/ads_lds_ingress.json", []byte(strResponse), 0644)
 
 		if len(res.Resources) == 0 {
 			t.Fatal("No response")

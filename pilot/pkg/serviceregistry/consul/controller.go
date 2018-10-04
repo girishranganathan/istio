@@ -15,7 +15,6 @@
 package consul
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/consul/api"
@@ -98,7 +97,7 @@ func (c *Controller) getCatalogService(name string, q *api.QueryOptions) ([]*api
 	return endpoints, nil
 }
 
-// ManagementPorts retries set of health check ports by instance IP.
+// ManagementPorts retrieves set of health check ports by instance IP.
 // This does not apply to Consul service registry, as Consul does not
 // manage the service instances. In future, when we integrate Nomad, we
 // might revisit this function.
@@ -106,11 +105,12 @@ func (c *Controller) ManagementPorts(addr string) model.PortList {
 	return nil
 }
 
-// Instances retrieves instances for a service and its ports that match
-// any of the supplied labels. All instances match an empty tag list.
-func (c *Controller) Instances(hostname model.Hostname, ports []string,
-	labels model.LabelsCollection) ([]*model.ServiceInstance, error) {
-	return nil, fmt.Errorf("NOT IMPLEMENTED")
+// WorkloadHealthCheckInfo retrieves set of health check info by instance IP.
+// This does not apply to Consul service registry, as Consul does not
+// manage the service instances. In future, when we integrate Nomad, we
+// might revisit this function.
+func (c *Controller) WorkloadHealthCheckInfo(addr string) model.ProbeList {
+	return nil
 }
 
 // InstancesByPort retrieves instances for a service that match
@@ -195,7 +195,7 @@ func (c *Controller) AppendInstanceHandler(f func(*model.ServiceInstance, model.
 }
 
 // GetIstioServiceAccounts implements model.ServiceAccounts operation TODO
-func (c *Controller) GetIstioServiceAccounts(hostname model.Hostname, ports []string) []string {
+func (c *Controller) GetIstioServiceAccounts(hostname model.Hostname, ports []int) []string {
 	// Need to get service account of service registered with consul
 	// Currently Consul does not have service account or equivalent concept
 	// As a step-1, to enabling istio security in Consul, We assume all the services run in default service account

@@ -22,34 +22,29 @@ import (
 
 // MinimalConfig is a very basic configuration, mainly useful for testing the perf infrastructure itself,
 var MinimalConfig = Config{
-	Service:                 minimalSvcCfg,
-	Global:                  minimalGlobalCfg,
-	IdentityAttribute:       `destination.rpcServer`,
-	IdentityAttributeDomain: `svc.cluster.local`,
+	Service: minimalSvcCfg,
+	Global:  minimalGlobalCfg,
 }
 
 // MinimalSetup is a very basic setup, mainly useful for testing the perf infrastructure itself.
 var MinimalSetup = Setup{
 	Config: MinimalConfig,
-	Load: Load{
+	Loads: []Load{{
 		Multiplier:  100,
 		StableOrder: false,
 		Requests: []Request{
 
-			BasicReport{
-				Attributes: map[string]interface{}{
-					"foo": "bar",
-					"baz": 42,
-				},
-			},
+			BuildBasicReport(map[string]interface{}{
+				"foo": "bar",
+				"baz": 42,
+			}),
 
-			BasicCheck{
-				Attributes: map[string]interface{}{
+			BuildBasicCheck(
+				map[string]interface{}{
 					"bar": "baz",
 					"foo": 23,
 				},
-
-				Quotas: map[string]istio_mixer_v1.CheckRequest_QuotaParams{
+				map[string]istio_mixer_v1.CheckRequest_QuotaParams{
 					"q1": {
 						Amount:     23,
 						BestEffort: true,
@@ -58,10 +53,9 @@ var MinimalSetup = Setup{
 						Amount:     54,
 						BestEffort: false,
 					},
-				},
-			},
+				}),
 		},
-	},
+	}},
 }
 
 const (

@@ -28,26 +28,23 @@ import (
 // include any expression evaluation.
 var baseSingleCheckSetup = perf.Setup{
 	Config: perf.Config{
-		Global:                  minimalServiceConfig,
-		Service:                 joinConfigs(h1Noop, i2CheckNothing, r2UsingH1AndI2),
-		IdentityAttribute:       "destination.service",
-		IdentityAttributeDomain: "svc.cluster.local",
-		SingleThreaded:          true,
+		Global:         minimalServiceConfig,
+		Service:        joinConfigs(h1Noop, i2CheckNothing, r2UsingH1AndI2),
+		SingleThreaded: true,
 	},
 
-	Load: perf.Load{
+	Loads: []perf.Load{{
 		Multiplier: 1,
 		Requests: []perf.Request{
-			perf.BasicCheck{
-				Attributes: map[string]interface{}{
+			perf.BuildBasicCheck(
+				map[string]interface{}{
 					"attr.bool":   true,
 					"attr.string": "str1",
 					"attr.double": float64(23.45),
 					"attr.int64":  int64(42),
-				},
-			},
+				}, nil),
 		},
-	},
+	}},
 }
 
 func Benchmark_Single_Check(b *testing.B) {

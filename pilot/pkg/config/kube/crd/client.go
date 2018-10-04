@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:generate sh -c "./generate.sh config.go > types.go"
-
 // Package crd provides an implementation of the config store and cache
 // using Kubernetes Custom Resources and the informer framework from Kubernetes
 package crd
@@ -31,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
+
 	// import GKE cluster authentication plugin
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	// import OIDC cluster authentication plugin, e.g. for Tectonic
@@ -115,8 +114,8 @@ func newClientSet(descriptor model.ConfigDescriptor) (map[string]*restClient, er
 	return cs, nil
 }
 
-func (rc *restClient) init(kubeconfig string) error {
-	cfg, err := rc.createRESTConfig(kubeconfig)
+func (rc *restClient) init(kubeconfig string, context string) error {
+	cfg, err := rc.createRESTConfig(kubeconfig, context)
 	if err != nil {
 		return err
 	}
@@ -132,8 +131,8 @@ func (rc *restClient) init(kubeconfig string) error {
 }
 
 // createRESTConfig for cluster API server, pass empty config file for in-cluster
-func (rc *restClient) createRESTConfig(kubeconfig string) (config *rest.Config, err error) {
-	config, err = kubecfg.BuildClientConfig(kubeconfig)
+func (rc *restClient) createRESTConfig(kubeconfig string, context string) (config *rest.Config, err error) {
+	config, err = kubecfg.BuildClientConfig(kubeconfig, context)
 
 	if err != nil {
 		return nil, err
@@ -161,7 +160,8 @@ func (rc *restClient) createRESTConfig(kubeconfig string) (config *rest.Config, 
 // NewClient creates a client to Kubernetes API using a kubeconfig file.
 // Use an empty value for `kubeconfig` to use the in-cluster config.
 // If the kubeconfig file is empty, defaults to in-cluster config as well.
-func NewClient(config string, descriptor model.ConfigDescriptor, domainSuffix string) (*Client, error) {
+// You can also choose a config context by providing the desired context name.
+func NewClient(config string, context string, descriptor model.ConfigDescriptor, domainSuffix string) (*Client, error) {
 	cs, err := newClientSet(descriptor)
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func NewClient(config string, descriptor model.ConfigDescriptor, domainSuffix st
 	}
 
 	for _, v := range out.clientset {
-		if err := v.init(config); err != nil {
+		if err := v.init(config, context); err != nil {
 			return nil, err
 		}
 	}
@@ -230,6 +230,10 @@ func (rc *restClient) registerResources() error {
 	for _, schema := range rc.descriptor {
 		g := ResourceGroup(&schema)
 		name := ResourceName(schema.Plural) + "." + g
+		crdScope := apiextensionsv1beta1.NamespaceScoped
+		if schema.ClusterScoped {
+			crdScope = apiextensionsv1beta1.ClusterScoped
+		}
 		crd := &apiextensionsv1beta1.CustomResourceDefinition{
 			ObjectMeta: meta_v1.ObjectMeta{
 				Name: name,
@@ -237,7 +241,7 @@ func (rc *restClient) registerResources() error {
 			Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
 				Group:   g,
 				Version: schema.Version,
-				Scope:   apiextensionsv1beta1.NamespaceScoped,
+				Scope:   crdScope,
 				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 					Plural: ResourceName(schema.Plural),
 					Kind:   KabobCaseToCamelCase(schema.Type),
@@ -280,10 +284,7 @@ func (rc *restClient) registerResources() error {
 	})
 
 	if errPoll != nil {
-		deleteErr := rc.deregisterResources()
-		if deleteErr != nil {
-			return multierror.Append(errPoll, deleteErr)
-		}
+		log.Error("failed to verify CRD creation")
 		return errPoll
 	}
 
@@ -293,7 +294,7 @@ func (rc *restClient) registerResources() error {
 // DeregisterResources removes third party resources
 func (cl *Client) DeregisterResources() error {
 	for k, rc := range cl.clientset {
-		log.Infof("deregistering for apiVersion ", k)
+		log.Infof("deregistering for apiVersion %s", k)
 		if err := rc.deregisterResources(); err != nil {
 			return err
 		}
@@ -326,22 +327,22 @@ func (cl *Client) ConfigDescriptor() model.ConfigDescriptor {
 }
 
 // Get implements store interface
-func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
+func (cl *Client) Get(typ, name, namespace string) *model.Config {
 	s, ok := knownTypes[typ]
 	if !ok {
 		log.Warn("unknown type " + typ)
-		return nil, false
+		return nil
 	}
 	rc, ok := cl.clientset[apiVersion(&s.schema)]
 	if !ok {
 		log.Warn("cannot find client for type " + typ)
-		return nil, false
+		return nil
 	}
 
 	schema, exists := rc.descriptor.GetByType(typ)
 	if !exists {
 		log.Warn("cannot find proto schema for type " + typ)
-		return nil, false
+		return nil
 	}
 
 	config := s.object.DeepCopyObject().(IstioObject)
@@ -353,15 +354,15 @@ func (cl *Client) Get(typ, name, namespace string) (*model.Config, bool) {
 
 	if err != nil {
 		log.Warna(err)
-		return nil, false
+		return nil
 	}
 
 	out, err := ConvertObject(schema, config, cl.domainSuffix)
 	if err != nil {
 		log.Warna(err)
-		return nil, false
+		return nil
 	}
-	return out, true
+	return out
 }
 
 // Create implements store interface
@@ -376,7 +377,7 @@ func (cl *Client) Create(config model.Config) (string, error) {
 		return "", fmt.Errorf("unrecognized type %q", config.Type)
 	}
 
-	if err := schema.Validate(config.Spec); err != nil {
+	if err := schema.Validate(config.Name, config.Namespace, config.Spec); err != nil {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 
@@ -409,7 +410,7 @@ func (cl *Client) Update(config model.Config) (string, error) {
 		return "", fmt.Errorf("unrecognized type %q", config.Type)
 	}
 
-	if err := schema.Validate(config.Spec); err != nil {
+	if err := schema.Validate(config.Name, config.Namespace, config.Spec); err != nil {
 		return "", multierror.Prefix(err, "validation error:")
 	}
 

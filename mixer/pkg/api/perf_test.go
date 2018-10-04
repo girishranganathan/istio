@@ -48,12 +48,12 @@ func (bs *benchState) createGRPCServer() (string, error) {
 	}
 
 	// get everything wired up
-	bs.gs = grpc.NewServer(grpc.MaxConcurrentStreams(256), grpc.MaxMsgSize(1024*1024))
+	bs.gs = grpc.NewServer(grpc.MaxConcurrentStreams(256), grpc.MaxRecvMsgSize(1024*1024))
 
 	bs.gp = pool.NewGoroutinePool(32, false)
 	bs.gp.AddWorkers(32)
 
-	ms := NewGRPCServer(bs, bs.gp)
+	ms := NewGRPCServer(bs, bs.gp, nil)
 	bs.s = ms.(*grpcServer)
 	mixerpb.RegisterMixerServer(bs.gs, bs.s)
 
@@ -110,8 +110,8 @@ func (bs *benchState) Preprocess(ctx context.Context, requestBag attribute.Bag, 
 	return nil
 }
 
-func (bs *benchState) Check(ctx context.Context, bag attribute.Bag) (*adapter.CheckResult, error) {
-	result := &adapter.CheckResult{
+func (bs *benchState) Check(ctx context.Context, bag attribute.Bag) (adapter.CheckResult, error) {
+	result := adapter.CheckResult{
 		Status: status.OK,
 	}
 	return result, nil
@@ -133,9 +133,9 @@ func (bs *benchState) Done() {
 }
 
 func (bs *benchState) Quota(ctx context.Context, requestBag attribute.Bag,
-	qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
+	qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
 
-	qr := &adapter.QuotaResult{
+	qr := adapter.QuotaResult{
 		Status: status.OK,
 		Amount: 42,
 	}

@@ -21,10 +21,8 @@ import (
 	"reflect"
 	"time"
 
-	"k8s.io/api/extensions/v1beta1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	"k8s.io/client-go/informers/extensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
@@ -57,17 +55,7 @@ func NewController(client kubernetes.Interface, mesh *meshconfig.MeshConfig,
 	queue := kube.NewQueue(1 * time.Second)
 
 	log.Infof("Ingress controller watching namespaces %q", options.WatchedNamespace)
-	// informer framework from Kubernetes
-	informer := cache.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).List(opts)
-			},
-			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().Ingresses(options.WatchedNamespace).Watch(opts)
-			},
-		}, &v1beta1.Ingress{}, options.ResyncPeriod, cache.Indexers{})
-
+	informer := v1beta1.NewFilteredIngressInformer(client, options.WatchedNamespace, options.ResyncPeriod, cache.Indexers{}, nil)
 	informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
@@ -89,7 +77,7 @@ func NewController(client kubernetes.Interface, mesh *meshconfig.MeshConfig,
 		if !informer.HasSynced() {
 			return errors.New("waiting till full synchronization")
 		}
-		if ingress, ok := obj.(*v1beta1.Ingress); ok {
+		if ingress, ok := obj.(*extensionsv1beta1.Ingress); ok {
 			log.Infof("ingress event %s for %s/%s", event, ingress.Namespace, ingress.Name)
 		}
 		return nil
@@ -107,25 +95,25 @@ func NewController(client kubernetes.Interface, mesh *meshconfig.MeshConfig,
 
 func (c *controller) RegisterEventHandler(typ string, f func(model.Config, model.Event)) {
 	c.handler.Append(func(obj interface{}, event model.Event) error {
-		ingress, ok := obj.(*v1beta1.Ingress)
+		ingress, ok := obj.(*extensionsv1beta1.Ingress)
 		if !ok || !shouldProcessIngress(c.mesh, ingress) {
 			return nil
 		}
 
+		// In 1.0, Pilot has a single function, clearCache, which ignores
+		// the inputs.
+		// In future we may do smarter processing - but first we'll do
+		// major refactoring. No need to recompute everything and generate
+		// multiple events.
+
 		// TODO: This works well for Add and Delete events, but not so for Update:
 		// An updated ingress may also trigger an Add or Delete for one of its constituent sub-rules.
 		switch typ {
-		case model.IngressRule.Type:
-			rules := convertIngress(*ingress, c.domainSuffix)
-			for _, rule := range rules {
-				f(rule, event)
-			}
 		case model.Gateway.Type:
-			config, _ := ConvertIngressV1alpha3(*ingress, c.domainSuffix)
-			f(config, event)
+			//config, _ := ConvertIngressV1alpha3(*ingress, c.domainSuffix)
+			//f(config, event)
 		case model.VirtualService.Type:
-			_, config := ConvertIngressV1alpha3(*ingress, c.domainSuffix)
-			f(config, event)
+			f(model.Config{}, event)
 		}
 
 		return nil
@@ -143,50 +131,46 @@ func (c *controller) Run(stop <-chan struct{}) {
 }
 
 func (c *controller) ConfigDescriptor() model.ConfigDescriptor {
-	return model.ConfigDescriptor{model.IngressRule}
+	//TODO: are these two config descriptors right?
+	return model.ConfigDescriptor{model.Gateway, model.VirtualService}
 }
 
-func (c *controller) Get(typ, name, namespace string) (*model.Config, bool) {
-	if typ != model.IngressRule.Type && typ != model.Gateway.Type && typ != model.VirtualService.Type {
-		return nil, false
+//TODO: we don't return out of this function now
+func (c *controller) Get(typ, name, namespace string) *model.Config {
+	if typ != model.Gateway.Type && typ != model.VirtualService.Type {
+		return nil
 	}
 
 	ingressName, _, _, err := decodeIngressRuleName(name)
 	if err != nil {
-		return nil, false
+		return nil
 	}
 
 	storeKey := kube.KeyFunc(ingressName, namespace)
 	obj, exists, err := c.informer.GetStore().GetByKey(storeKey)
 	if err != nil || !exists {
-		return nil, false
+		return nil
 	}
 
-	ingress := obj.(*v1beta1.Ingress)
+	ingress := obj.(*extensionsv1beta1.Ingress)
 	if !shouldProcessIngress(c.mesh, ingress) {
-		return nil, false
+		return nil
 	}
 
-	if typ == model.IngressRule.Type {
-		rules := convertIngress(*ingress, c.domainSuffix)
-		for _, rule := range rules {
-			if rule.Name == name {
-				return &rule, true
-			}
-		}
-	}
-
-	return nil, false
+	return nil
 }
 
 func (c *controller) List(typ, namespace string) ([]model.Config, error) {
-	if typ != model.IngressRule.Type && typ != model.Gateway.Type && typ != model.VirtualService.Type {
+	if typ != model.Gateway.Type && typ != model.VirtualService.Type {
 		return nil, errUnsupportedOp
 	}
 
 	out := make([]model.Config, 0)
+
+	ingressByHost := map[string]*model.Config{}
+
 	for _, obj := range c.informer.GetStore().List() {
-		ingress := obj.(*v1beta1.Ingress)
+		ingress := obj.(*extensionsv1beta1.Ingress)
 		if namespace != "" && namespace != ingress.Namespace {
 			continue
 		}
@@ -197,14 +181,16 @@ func (c *controller) List(typ, namespace string) ([]model.Config, error) {
 
 		switch typ {
 		case model.VirtualService.Type:
-			_, virtualServices := ConvertIngressV1alpha3(*ingress, namespace)
-			out = append(out, virtualServices)
+			ConvertIngressVirtualService(*ingress, c.domainSuffix, ingressByHost)
 		case model.Gateway.Type:
-			gateways, _ := ConvertIngressV1alpha3(*ingress, namespace)
+			gateways := ConvertIngressV1alpha3(*ingress, c.domainSuffix)
 			out = append(out, gateways)
-		case model.IngressRule.Type:
-			rules := convertIngress(*ingress, c.domainSuffix)
-			out = append(out, rules...)
+		}
+	}
+
+	if typ == model.VirtualService.Type {
+		for _, obj := range ingressByHost {
+			out = append(out, *obj)
 		}
 	}
 

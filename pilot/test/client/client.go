@@ -83,6 +83,14 @@ func makeHTTPRequest(client *http.Client) job {
 				log.Printf("[%d] Header=%s:%s\n", i, headerKey, headerVal)
 			}
 
+			if strings.HasPrefix(url, "https://") {
+				// Set SNI value to be same as the request Host
+				// For use with SNI routing tests
+				var httpTransport *http.Transport
+				httpTransport = client.Transport.(*http.Transport)
+				httpTransport.TLSClientConfig.ServerName = req.Host
+			}
+
 			resp, err := client.Do(req)
 			if err != nil {
 				return err
@@ -220,11 +228,13 @@ func setupDefaultTest() job {
 		}
 
 		var err error
-		grpcConn, err = grpc.Dial(address,
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+
+		grpcConn, err = grpc.DialContext(ctx, address,
 			security,
 			grpc.WithAuthority(authority),
-			grpc.WithBlock(),
-			grpc.WithTimeout(timeout))
+			grpc.WithBlock())
 		if err != nil {
 			log.Fatalf("did not connect: %v", err)
 			return nil

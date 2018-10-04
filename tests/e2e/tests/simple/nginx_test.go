@@ -126,7 +126,7 @@ func getApps(kubeMasterCIDR string) []framework.App {
 }
 
 func getApp(deploymentName, serviceName string, port1, port2, port3, port4, port5, port6 int, version string, injectProxy, perServiceAuth bool) framework.App {
-	// TODO(nmittler): Eureka does not support management ports ... should we support other registries?
+	// TODO(nmittler): Consul does not support management ports ... should we support other registries?
 	healthPort := "true"
 
 	// Return the config.
@@ -163,12 +163,12 @@ func (t *testConfig) imagePullPolicy() string {
 }
 
 func getKubeMasterCIDROrFail(t *testing.T) string {
-	ip, err := util.GetKubeMasterIP()
+	ip, err := util.GetKubeMasterIP(tc.Kube.KubeConfig)
 	if err != nil {
 		t.Fatalf("Unable to retrieve Kube Master IP: %v", err)
 		return ""
 	}
-	subnet, err := util.GetClusterSubnet()
+	subnet, err := util.GetClusterSubnet(tc.Kube.KubeConfig)
 	if err != nil {
 		t.Fatalf("Unable to determine cluster subnet: %v", err)
 	}

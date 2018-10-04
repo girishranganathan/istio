@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
@@ -25,42 +26,77 @@ import (
 )
 
 type (
+	namedEncoderFn func(data interface{}) ([]byte, error)
+
 	// Encoder transforms yaml that represents protobuf data into []byte
 	Encoder struct {
-		resolver Resolver
+		resolver     Resolver
+		namedEncoder map[string]namedEncoderFn
 	}
 )
 
 // NewEncoder creates an Encoder
 func NewEncoder(fds *descriptor.FileDescriptorSet) *Encoder {
 	resolver := NewResolver(fds)
-	return &Encoder{resolver: resolver}
+	return &Encoder{resolver: resolver, namedEncoder: namedEncoderRegistry}
 }
 
 // EncodeBytes creates []byte from a yaml representation of a proto.
-func (e *Encoder) EncodeBytes(data map[interface{}]interface{}, msgName string, skipUnknown bool) ([]byte, error) {
+func (e *Encoder) EncodeBytes(data map[string]interface{}, msgName string, skipUnknown bool) ([]byte, error) {
 	buf := GetBuffer()
 	defer func() { PutBuffer(buf) }()
 
+	if err := e.coreEncodeBytes(buf, data, msgName, skipUnknown); err != nil {
+		return nil, err
+	}
+
+	original := buf.Bytes()
+	result := make([]byte, len(original), len(original))
+	copy(result, original)
+	return result, nil
+}
+
+// encodeBytes updates a proto.Buffer from a yaml representation of a proto.
+func (e *Encoder) encodeBytes(data map[string]interface{}, msgName string, skipUnknown bool, dest *proto.Buffer) error {
+	buf := GetBuffer()
+	defer func() { PutBuffer(buf) }()
+
+	if err := e.coreEncodeBytes(buf, data, msgName, skipUnknown); err != nil {
+		return err
+	}
+
+	_ = dest.EncodeRawBytes(buf.Bytes())
+	return nil
+}
+
+// coreEncodeBytes updates a proto.Buffer from a yaml representation of a proto.
+func (e *Encoder) coreEncodeBytes(buf *proto.Buffer, data map[string]interface{}, msgName string, skipUnknown bool) error {
 	message := e.resolver.ResolveMessage(msgName)
 	if message == nil {
-		return nil, fmt.Errorf("cannot resolve message '%s'", msgName)
+		return fmt.Errorf("cannot resolve message '%s'", msgName)
 	}
-	for k, v := range data {
-		fd := FindFieldByName(message, k.(string))
+	// Sort entries so the result is deterministic.
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v := data[k]
+		fd := FindFieldByName(message, k)
 		if fd == nil {
 			if skipUnknown {
 				continue
 			}
-			return nil, fmt.Errorf("field '%s' not found in message '%s'", k, message.GetName())
+			return fmt.Errorf("field '%s' not found in message '%s'", k, message.GetName())
 		}
 
-		if err := e.visit(k.(string), v, fd, skipUnknown, buf); err != nil {
-			return nil, err
+		if err := e.visit(k, v, fd, skipUnknown, buf); err != nil {
+			return err
 		}
-
 	}
-	return buf.Bytes(), nil
+
+	return nil
 }
 
 func (e *Encoder) visit(name string, data interface{}, field *descriptor.FieldDescriptorProto, skipUnknown bool, buffer *proto.Buffer) error {
@@ -776,7 +812,7 @@ func (e *Encoder) visit(name string, data interface{}, field *descriptor.FieldDe
 			mapInfo := e.mapType(field)
 			keyType := typeName(mapInfo.KeyField)
 			valType := typeName(mapInfo.ValueField)
-			v, ok := data.(map[interface{}]interface{})
+			v, ok := data.(map[string]interface{})
 			if !ok {
 				return badTypeError(name, fmt.Sprintf("map<%s, %s>", keyType, valType), data)
 			}
@@ -788,18 +824,25 @@ func (e *Encoder) visit(name string, data interface{}, field *descriptor.FieldDe
 			//	}
 			//	repeated MapEntry map = N;
 
+			// Sort entries so that encoded bytes are deterministic
+			keys := make([]string, 0, len(v))
+			for k := range v {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
 			// So, we can create a map[key_type]value_type and use it to encode the MapEntry, repeatedly.
-			for key, val := range v {
-				tmpMapEntry := make(map[interface{}]interface{}, 2)
+			for _, key := range keys {
+				val := v[key]
+				tmpMapEntry := make(map[string]interface{}, 2)
 				tmpMapEntry["key"] = key
 				tmpMapEntry["value"] = val
-				bytes, err := e.EncodeBytes(tmpMapEntry, field.GetTypeName(), skipUnknown)
-				if err != nil {
-					return fmt.Errorf("/%s: '%v'", fmt.Sprintf("%s[%v]", name, key), err)
-				}
 
 				_ = buffer.EncodeVarint(encodeIndexAndType(fieldNumber, wireType))
-				_ = buffer.EncodeRawBytes(bytes)
+
+				if err := e.encodeBytes(tmpMapEntry, field.GetTypeName(), skipUnknown, buffer); err != nil {
+					return fmt.Errorf("/%s: '%v'", fmt.Sprintf("%s[%v]", name, key), err)
+				}
 			}
 		} else if repeated {
 			// 	generated proto code for repeated message fields
@@ -823,17 +866,15 @@ func (e *Encoder) visit(name string, data interface{}, field *descriptor.FieldDe
 			}
 
 			for i, iface := range v {
-				c, ok := iface.(map[interface{}]interface{})
+				c, ok := iface.(map[string]interface{})
 				if !ok {
 					return badTypeError(fmt.Sprintf("%s[%d]", name, i), tName, iface)
 				}
-				bytes, err := e.EncodeBytes(c, field.GetTypeName(), skipUnknown)
-				if err != nil {
-					return fmt.Errorf("/%s: '%v'", fmt.Sprintf("%s[%d]", name, i), err)
-				}
 
 				_ = buffer.EncodeVarint(encodeIndexAndType(fieldNumber, wireType))
-				_ = buffer.EncodeRawBytes(bytes)
+				if err := e.encodeBytes(c, field.GetTypeName(), skipUnknown, buffer); err != nil {
+					return fmt.Errorf("/%s: '%v'", fmt.Sprintf("%s[%d]", name, i), err)
+				}
 			}
 		} else {
 			// 	generated proto code for field of message type
@@ -846,17 +887,25 @@ func (e *Encoder) visit(name string, data interface{}, field *descriptor.FieldDe
 			//		return 0, err
 			//	}
 			//	i += n1
-			v, ok := data.(map[interface{}]interface{})
-			if !ok {
-				return badTypeError(name, strings.TrimPrefix(field.GetTypeName(), "."), data)
-			}
-
-			bytes, err := e.EncodeBytes(v, field.GetTypeName(), skipUnknown)
-			if err != nil {
-				return fmt.Errorf("/%s: '%v'", name, err)
-			}
 			_ = buffer.EncodeVarint(encodeIndexAndType(fieldNumber, wireType))
-			_ = buffer.EncodeRawBytes(bytes)
+
+			ne := e.namedEncoder[field.GetTypeName()]
+			if ne != nil {
+				bytes, err := ne(data)
+				if err != nil {
+					return fmt.Errorf("/%s: '%v'", name, err)
+				}
+				buffer.EncodeRawBytes(bytes)
+			} else {
+				v, ok := data.(map[string]interface{})
+				if !ok {
+					return badTypeError(name, strings.TrimPrefix(field.GetTypeName(), "."), data)
+				}
+
+				if err := e.encodeBytes(v, field.GetTypeName(), skipUnknown, buffer); err != nil {
+					return fmt.Errorf("/%s: '%v'", name, err)
+				}
+			}
 
 			return nil
 		}

@@ -21,6 +21,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gogo/googleapis/google/rpc"
 	"google.golang.org/grpc"
@@ -28,6 +29,7 @@ import (
 	mixerpb "istio.io/api/mixer/v1"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/pkg/attribute"
+	"istio.io/istio/mixer/pkg/checkcache"
 	"istio.io/istio/mixer/pkg/pool"
 	"istio.io/istio/mixer/pkg/runtime/dispatcher"
 	"istio.io/istio/mixer/pkg/status"
@@ -35,10 +37,10 @@ import (
 )
 
 type preprocCallback func(ctx context.Context, requestBag attribute.Bag, responseBag *attribute.MutableBag) error
-type checkCallback func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error)
+type checkCallback func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error)
 type reportCallback func(ctx context.Context, requestBag attribute.Bag) error
 type quotaCallback func(ctx context.Context, requestBag attribute.Bag,
-	qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error)
+	qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error)
 
 type testState struct {
 	client     mixerpb.MixerClient
@@ -48,10 +50,11 @@ type testState struct {
 	s          *grpcServer
 	ctx        context.Context
 
-	check   checkCallback
-	report  reportCallback
-	quota   quotaCallback
-	preproc preprocCallback
+	check      checkCallback
+	report     reportCallback
+	quota      quotaCallback
+	preproc    preprocCallback
+	flushError error
 }
 
 func (ts *testState) createGRPCServer() (string, error) {
@@ -63,7 +66,7 @@ func (ts *testState) createGRPCServer() (string, error) {
 
 	var grpcOptions []grpc.ServerOption
 	grpcOptions = append(grpcOptions, grpc.MaxConcurrentStreams(32))
-	grpcOptions = append(grpcOptions, grpc.MaxMsgSize(1024*1024))
+	grpcOptions = append(grpcOptions, grpc.MaxRecvMsgSize(1024*1024))
 
 	// get everything wired up
 	ts.gs = grpc.NewServer(grpcOptions...)
@@ -71,7 +74,7 @@ func (ts *testState) createGRPCServer() (string, error) {
 	ts.gp = pool.NewGoroutinePool(128, false)
 	ts.gp.AddWorkers(32)
 
-	ms := NewGRPCServer(ts, ts.gp)
+	ms := NewGRPCServer(ts, ts.gp, checkcache.New(10))
 	ts.s = ms.(*grpcServer)
 	mixerpb.RegisterMixerServer(ts.gs, ts.s)
 
@@ -130,7 +133,7 @@ func (ts *testState) cleanupTestState() {
 	ts.deleteGRPCServer()
 }
 
-func (ts *testState) Check(ctx context.Context, bag attribute.Bag) (*adapter.CheckResult, error) {
+func (ts *testState) Check(ctx context.Context, bag attribute.Bag) (adapter.CheckResult, error) {
 	return ts.check(ctx, bag)
 }
 
@@ -144,14 +147,14 @@ func (ts *testState) Report(bag attribute.Bag) error {
 }
 
 func (ts *testState) Flush() error {
-	return nil
+	return ts.flushError
 }
 
 func (ts *testState) Done() {
 }
 
 func (ts *testState) Quota(ctx context.Context, bag attribute.Bag,
-	qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
+	qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
 
 	return ts.quota(ctx, bag, qma)
 }
@@ -167,28 +170,25 @@ func TestCheck(t *testing.T) {
 	}
 	defer ts.cleanupTestState()
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
-		return &adapter.CheckResult{
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
 			Status: status.WithPermissionDenied("Not Implemented"),
 		}, nil
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
-		return &adapter.QuotaResult{
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
+		return adapter.QuotaResult{
 			Amount: 42,
 		}, nil
 	}
 
-	attr0 := mixerpb.CompressedAttributes{
-		Words: []string{"A1", "A2", "A3"},
-		Int64S: map[int32]int64{
-			-1: 25,
-			-2: 26,
-			-3: 27,
-		},
-	}
+	attr0 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A1": 25.0,
+		"A2": 26.0,
+		"A3": 27.0,
+	})
 
-	request := mixerpb.CheckRequest{Attributes: attr0}
+	request := mixerpb.CheckRequest{Attributes: *attr0}
 	request.Quotas = make(map[string]mixerpb.CheckRequest_QuotaParams)
 	request.Quotas["RequestCount"] = mixerpb.CheckRequest_QuotaParams{Amount: 42}
 
@@ -205,9 +205,9 @@ func TestCheck(t *testing.T) {
 		t.Errorf("Got %v granted amount, expecting 0", response.Quotas["RequestCount"].GrantedAmount)
 	}
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
 		// simulate an error condition
-		return nil, errors.New("BAD")
+		return adapter.CheckResult{}, errors.New("BAD")
 	}
 
 	_, err = ts.client.Check(context.Background(), &request)
@@ -215,9 +215,9 @@ func TestCheck(t *testing.T) {
 		t.Error("Got success, expecting failure")
 	}
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
 		// simulate a "no check performed" condition
-		return nil, nil
+		return adapter.CheckResult{}, nil
 	}
 
 	response, err = ts.client.Check(context.Background(), &request)
@@ -231,14 +231,14 @@ func TestCheck(t *testing.T) {
 		t.Errorf("Got %v, expecting success", err)
 	}
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
-		return &adapter.CheckResult{
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
 			Status: status.WithPermissionDenied("Not Implemented"),
 		}, nil
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
-		return &adapter.QuotaResult{
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
+		return adapter.QuotaResult{
 			Status: status.WithPermissionDenied("Not Implemented"),
 		}, nil
 	}
@@ -249,21 +249,95 @@ func TestCheck(t *testing.T) {
 		t.Errorf("Got %v, expected success", err)
 	}
 
+	if err != nil {
+		t.Errorf("Got %v, expected success", err)
+	}
+
 	ts.preproc = func(ctx context.Context, requestBag attribute.Bag, responseBag *attribute.MutableBag) error {
 		responseBag.Set("genAttrGen", "genAttrGenValue")
 		return nil
 	}
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
 		if val, _ := requestBag.Get("genAttrGen"); val != "genAttrGenValue" {
-			return nil, errors.New("generated attribute via preproc not part of check attributes")
+			return adapter.CheckResult{}, errors.New("generated attribute via preproc not part of check attributes")
 		}
-		return &adapter.CheckResult{}, nil
+		return adapter.CheckResult{}, nil
 	}
 
 	chkRes, err := ts.client.Check(context.Background(), &request)
 	if err != nil || chkRes.Precondition.Status.Code != 0 {
 		t.Errorf("Got error; expect success: %v, %v", chkRes, err)
+	}
+}
+
+func TestCheckCachedDenial(t *testing.T) {
+	ts, err := prepTestState()
+	if err != nil {
+		t.Fatalf("Unable to prep test state: %v", err)
+	}
+	defer ts.cleanupTestState()
+
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
+			Status:        status.WithPermissionDenied("Not Implemented"),
+			ValidDuration: time.Hour * 1000,
+		}, nil
+	}
+
+	attr0 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A1": 25.0,
+		"A2": 26.0,
+		"A3": 27.0,
+	})
+
+	request := mixerpb.CheckRequest{Attributes: *attr0}
+
+	// do this twice to try out cached denials
+	for i := 0; i < 2; i++ {
+		cr, err := ts.client.Check(context.Background(), &request)
+		if err != nil {
+			t.Errorf("Expecting success, got %v", err)
+		}
+
+		if status.IsOK(cr.Precondition.Status) {
+			t.Errorf("Expecting error, got OK")
+		}
+	}
+}
+
+func TestCheckCachedAllow(t *testing.T) {
+	ts, err := prepTestState()
+	if err != nil {
+		t.Fatalf("Unable to prep test state: %v", err)
+	}
+	defer ts.cleanupTestState()
+
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
+			Status:        status.OK,
+			ValidDuration: time.Hour * 1000,
+		}, nil
+	}
+
+	attr0 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A1": 25.0,
+		"A2": 26.0,
+		"A3": 27.0,
+	})
+
+	request := mixerpb.CheckRequest{Attributes: *attr0}
+
+	// do this twice to try out cached denials
+	for i := 0; i < 2; i++ {
+		cr, err := ts.client.Check(context.Background(), &request)
+		if err != nil {
+			t.Errorf("Expecting success, got %v", err)
+		}
+
+		if !status.IsOK(cr.Precondition.Status) {
+			t.Errorf("Expecting OK, got error")
+		}
 	}
 }
 
@@ -274,28 +348,25 @@ func TestCheckQuota(t *testing.T) {
 	}
 	defer ts.cleanupTestState()
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
-		return &adapter.CheckResult{
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
 			Status: status.OK,
 		}, nil
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
-		return &adapter.QuotaResult{
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
+		return adapter.QuotaResult{
 			Amount: 42,
 		}, nil
 	}
 
-	attr0 := mixerpb.CompressedAttributes{
-		Words: []string{"A1", "A2", "A3"},
-		Int64S: map[int32]int64{
-			-1: 25,
-			-2: 26,
-			-3: 27,
-		},
-	}
+	attr0 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A1": 25.0,
+		"A2": 26.0,
+		"A3": 27.0,
+	})
 
-	request := mixerpb.CheckRequest{Attributes: attr0}
+	request := mixerpb.CheckRequest{Attributes: *attr0}
 	request.Quotas = make(map[string]mixerpb.CheckRequest_QuotaParams)
 	request.Quotas["RequestCount"] = mixerpb.CheckRequest_QuotaParams{Amount: 42}
 
@@ -309,8 +380,8 @@ func TestCheckQuota(t *testing.T) {
 		t.Errorf("Got %v granted amount, expecting 42", response.Quotas["RequestCount"].GrantedAmount)
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
-		return &adapter.QuotaResult{
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
+		return adapter.QuotaResult{
 			Status: status.WithPermissionDenied("Not Implemented"),
 		}, nil
 	}
@@ -321,9 +392,9 @@ func TestCheckQuota(t *testing.T) {
 		t.Errorf("Got %v, expected success", err)
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
 		// simulate an error condition
-		return nil, errors.New("BAD")
+		return adapter.QuotaResult{}, errors.New("BAD")
 	}
 
 	_, err = ts.client.Check(context.Background(), &request)
@@ -332,9 +403,9 @@ func TestCheckQuota(t *testing.T) {
 		t.Errorf("Got %v, expecting success", err)
 	}
 
-	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma *dispatcher.QuotaMethodArgs) (*adapter.QuotaResult, error) {
+	ts.quota = func(ctx context.Context, requestBag attribute.Bag, qma dispatcher.QuotaMethodArgs) (adapter.QuotaResult, error) {
 		// simulate an "no quotas applied" condition
-		return nil, nil
+		return adapter.QuotaResult{}, nil
 	}
 
 	response, err = ts.client.Check(context.Background(), &request)
@@ -372,6 +443,13 @@ func TestReport(t *testing.T) {
 		t.Errorf("Expected success, got error: %v", err)
 	}
 
+	ts.flushError = errors.New("BADFOOD")
+	_, err = ts.client.Report(context.Background(), &request)
+	if err == nil {
+		t.Errorf("Expected error, got success")
+	}
+	ts.flushError = nil
+
 	ts.report = func(ctx context.Context, requestBag attribute.Bag) error {
 		return errors.New("not Implemented")
 	}
@@ -382,29 +460,20 @@ func TestReport(t *testing.T) {
 	}
 
 	// test out delta encoding of attributes
-	attr0 := mixerpb.CompressedAttributes{
-		Words: []string{"A1", "A2", "A3", "A4"},
-		Int64S: map[int32]int64{
-			-1: 25,
-			-2: 26,
-			-3: 27,
-			-4: 28,
-		},
-	}
+	attr0 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A1": int64(25),
+		"A2": int64(26),
+		"A3": int64(27),
+		"A4": int64(28),
+	})
 
-	attr1 := mixerpb.CompressedAttributes{
-		Words: []string{"A1", "A2", "A3"},
-		Int64S: map[int32]int64{
-			-2: 42,
-		},
-	}
+	attr1 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A2": int64(42),
+	})
 
-	attr2 := mixerpb.CompressedAttributes{
-		Words: []string{"A4"},
-		Int64S: map[int32]int64{
-			-1: 31415692,
-		},
-	}
+	attr2 := attribute.GetProtoForTesting(map[string]interface{}{
+		"A4": int64(31415692),
+	})
 
 	callCount := 0
 	ts.report = func(ctx context.Context, requestBag attribute.Bag) error {
@@ -419,7 +488,7 @@ func TestReport(t *testing.T) {
 		i4 := v4.(int64)
 
 		if callCount == 0 {
-			if i1 != 25 || i2 != 26 || i3 != 27 {
+			if i1 != 25.0 || i2 != 26 || i3 != 27 {
 				t.Errorf("Got %d %d %d, expected 25 26 27", i1, i2, i3)
 			}
 		} else if callCount == 1 {
@@ -437,7 +506,7 @@ func TestReport(t *testing.T) {
 		return nil
 	}
 
-	request = mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{attr0, attr1, attr2}}
+	request = mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{*attr0, *attr1, *attr2}}
 	_, _ = ts.client.Report(context.Background(), &request)
 
 	if callCount != 3 {
@@ -467,7 +536,7 @@ func TestReport(t *testing.T) {
 		},
 	}
 
-	request = mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{attr0, badAttr}}
+	request = mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{*attr0, badAttr}}
 	if _, err = ts.client.Report(context.Background(), &request); err == nil {
 		t.Errorf("Got success, expected failure")
 	}
@@ -480,8 +549,8 @@ func TestUnknownStatus(t *testing.T) {
 	}
 	defer ts.cleanupTestState()
 
-	ts.check = func(ctx context.Context, requestBag attribute.Bag) (*adapter.CheckResult, error) {
-		return &adapter.CheckResult{
+	ts.check = func(ctx context.Context, requestBag attribute.Bag) (adapter.CheckResult, error) {
+		return adapter.CheckResult{
 			Status: rpc.Status{
 				Code:    12345678,
 				Message: "DEADBEEF!",
@@ -531,6 +600,40 @@ func TestFailingPreproc(t *testing.T) {
 			t.Error("Got success, expected failure")
 		} else if !strings.Contains(err.Error(), "123 preproc failed") {
 			t.Errorf("Got '%s', expected '123 preproc failed'", err.Error())
+		}
+	}
+}
+
+func TestOutOfSyncDict(t *testing.T) {
+	ts, err := prepTestState()
+	if err != nil {
+		t.Fatalf("Unable to prep test state: %v", err)
+	}
+	defer ts.cleanupTestState()
+
+	{
+		request := mixerpb.CheckRequest{GlobalWordCount: 9999}
+		resp, err := ts.client.Check(context.Background(), &request)
+		if resp != nil {
+			t.Error("Expecting no response, got one")
+		}
+		if err == nil {
+			t.Error("Got success, expected failure")
+		} else if !strings.Contains(err.Error(), "inconsistent global dictionary versions") {
+			t.Errorf("Got '%s', expected 'inconsistent global dictionary versions'", err.Error())
+		}
+	}
+
+	{
+		request := mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{{}}, GlobalWordCount: 9999}
+		resp, err := ts.client.Report(context.Background(), &request)
+		if resp != nil {
+			t.Error("Expecting no response, got one")
+		}
+		if err == nil {
+			t.Error("Got success, expected failure")
+		} else if !strings.Contains(err.Error(), "inconsistent global dictionary versions") {
+			t.Errorf("Got '%s', expected 'inconsistent global dictionary versions'", err.Error())
 		}
 	}
 }

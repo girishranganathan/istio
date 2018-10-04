@@ -12,7 +12,8 @@ spec:
       protocol: HTTP
     hosts:
     - uk.bookinfo.com
-    - eu1.bookinfo.com
+    - eu.bookinfo.com
+    - c.foo
     tls:
       httpsRedirect: true # sends 302 redirect for http requests
   - port:

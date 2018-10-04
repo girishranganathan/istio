@@ -27,6 +27,7 @@ import (
 	"istio.io/istio/mixer/pkg/config/store"
 	"istio.io/istio/mixer/pkg/lang/checker"
 	"istio.io/istio/mixer/pkg/runtime/config"
+	"istio.io/istio/mixer/pkg/runtime/config/constant"
 	"istio.io/istio/mixer/pkg/template"
 )
 
@@ -40,9 +41,12 @@ type Validator struct {
 
 // NewValidator creates a new store.Validator instance which validates runtime semantics of
 // the configs.
-func NewValidator(tc checker.TypeChecker, identityAttribute string, s store.Store,
+func NewValidator(tc checker.TypeChecker, s store.Store,
 	adapterInfo map[string]*adapter.Info, templateInfo map[string]*template.Info) (store.Validator, error) {
 	kinds := config.KindMap(adapterInfo, templateInfo)
+	if err := s.Init(kinds); err != nil {
+		return nil, err
+	}
 	data, ch, err := store.StartWatch(s, kinds)
 	if err != nil {
 		return nil, err
@@ -54,7 +58,7 @@ func NewValidator(tc checker.TypeChecker, identityAttribute string, s store.Stor
 	configData := make(map[store.Key]proto.Message, len(data))
 	manifests := map[store.Key]*cpb.AttributeManifest{}
 	for k, obj := range data {
-		if k.Kind == config.AttributeManifestKind {
+		if k.Kind == constant.AttributeManifestKind {
 			manifests[k] = obj.Spec.(*cpb.AttributeManifest)
 		}
 		configData[k] = obj.Spec

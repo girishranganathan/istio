@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -113,7 +112,100 @@ func (authz *mockAuthorizer) authorize(requester *caller, requestedIds []string)
 	return nil
 }
 
-func TestSign(t *testing.T) {
+func TestCreateCertificate(t *testing.T) {
+	testCases := map[string]struct {
+		authenticators []authenticator
+		authorizer     *mockAuthorizer
+		ca             ca.CertificateAuthority
+		certChain      []string
+		code           codes.Code
+	}{
+		"No authenticator": {
+			authenticators: nil,
+			code:           codes.Unauthenticated,
+			authorizer:     &mockAuthorizer{},
+			ca:             &mockca.FakeCA{},
+		},
+		"Unauthenticated request": {
+			authenticators: []authenticator{&mockAuthenticator{
+				errMsg: "Not authorized",
+			}},
+			code:       codes.Unauthenticated,
+			authorizer: &mockAuthorizer{},
+			ca:         &mockca.FakeCA{},
+		},
+		"CA not ready": {
+			authorizer:     &mockAuthorizer{},
+			authenticators: []authenticator{&mockAuthenticator{}},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
+			code:           codes.Internal,
+		},
+		"Invalid CSR": {
+			authorizer:     &mockAuthorizer{},
+			authenticators: []authenticator{&mockAuthenticator{}},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CSRError, fmt.Errorf("cannot sign"))},
+			code:           codes.InvalidArgument,
+		},
+		"Invalid TTL": {
+			authorizer:     &mockAuthorizer{},
+			authenticators: []authenticator{&mockAuthenticator{}},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.TTLError, fmt.Errorf("cannot sign"))},
+			code:           codes.InvalidArgument,
+		},
+		"Failed to sign": {
+			authorizer:     &mockAuthorizer{},
+			authenticators: []authenticator{&mockAuthenticator{}},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CertGenError, fmt.Errorf("cannot sign"))},
+			code:           codes.Internal,
+		},
+		"Successful signing": {
+			authenticators: []authenticator{&mockAuthenticator{}},
+			authorizer:     &mockAuthorizer{},
+			ca: &mockca.FakeCA{
+				SignedCert: []byte("cert"),
+				KeyCertBundle: &mockutil.FakeKeyCertBundle{
+					CertChainBytes: []byte("cert_chain"),
+					RootCertBytes:  []byte("root_cert"),
+				},
+			},
+			certChain: []string{"cert", "cert_chain", "root_cert"},
+			code:      codes.OK,
+		},
+	}
+
+	for id, c := range testCases {
+		server := &Server{
+			ca:             c.ca,
+			hostnames:      []string{"hostname"},
+			port:           8080,
+			authorizer:     c.authorizer,
+			authenticators: c.authenticators,
+			monitoring:     newMonitoringMetrics(),
+		}
+		request := &pb.IstioCertificateRequest{Csr: "dumb CSR"}
+
+		response, err := server.CreateCertificate(context.Background(), request)
+		s, _ := status.FromError(err)
+		code := s.Code()
+		if c.code != code {
+			t.Errorf("Case %s: expecting code to be (%d) but got (%d): %s", id, c.code, code, s.Message())
+		} else if c.code == codes.OK {
+			if len(response.CertChain) != len(c.certChain) {
+				t.Errorf("Case %s: expecting cert chain length to be (%d) but got (%d)",
+					id, len(c.certChain), len(response.CertChain))
+			}
+			for i, v := range response.CertChain {
+				if v != c.certChain[i] {
+					t.Errorf("Case %s: expecting cert to be (%s) but got (%s) at position [%d] of cert chain.",
+						id, c.certChain, v, i)
+				}
+			}
+
+		}
+	}
+}
+
+func TestHandleCSR(t *testing.T) {
 	testCases := map[string]struct {
 		authenticators []authenticator
 		authorizer     *mockAuthorizer
@@ -127,7 +219,7 @@ func TestSign(t *testing.T) {
 			authenticators: nil,
 			code:           codes.Unauthenticated,
 			authorizer:     &mockAuthorizer{},
-			ca:             &mockca.FakeCA{SignErr: fmt.Errorf("cannot sign")},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 		},
 		"Unauthenticated request": {
 			authenticators: []authenticator{&mockAuthenticator{
@@ -135,26 +227,26 @@ func TestSign(t *testing.T) {
 			}},
 			code:       codes.Unauthenticated,
 			authorizer: &mockAuthorizer{},
-			ca:         &mockca.FakeCA{SignErr: fmt.Errorf("cannot sign")},
+			ca:         &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 		},
 		"Corrupted CSR": {
 			authorizer:     &mockAuthorizer{},
 			authenticators: []authenticator{&mockAuthenticator{}},
-			ca:             &mockca.FakeCA{SignErr: fmt.Errorf("cannot sign")},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 			csr:            "deadbeef",
 			code:           codes.InvalidArgument,
 		},
 		"Invalid SAN CSR": {
 			authorizer:     &mockAuthorizer{},
 			authenticators: []authenticator{&mockAuthenticator{}},
-			ca:             &mockca.FakeCA{SignErr: fmt.Errorf("cannot sign")},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 			csr:            badSanCsr,
 			code:           codes.InvalidArgument,
 		},
 		"Failed to sign": {
 			authorizer:     &mockAuthorizer{},
 			authenticators: []authenticator{&mockAuthenticator{}},
-			ca:             &mockca.FakeCA{SignErr: fmt.Errorf("cannot sign")},
+			ca:             &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 			csr:            csr,
 			code:           codes.Internal,
 		},
@@ -254,19 +346,19 @@ func TestRun(t *testing.T) {
 			expectedErr: "cannot listen on port -1 (error: listen tcp: address -1: invalid port)",
 		},
 		"CA sign error": {
-			ca:                          &mockca.FakeCA{SignErr: errors.New("mock CA cannot sign")},
+			ca:                          &mockca.FakeCA{SignErr: ca.NewError(ca.CANotReady, fmt.Errorf("cannot sign"))},
 			hostname:                    []string{"localhost"},
 			port:                        0,
 			expectedErr:                 "",
-			expectedAuthenticatorsLen:   2,
-			applyServerCertificateError: "mock CA cannot sign",
+			expectedAuthenticatorsLen:   1, // 2 when ID token authenticators are enabled.
+			applyServerCertificateError: "cannot sign",
 		},
 		"Bad signed cert": {
 			ca:                        &mockca.FakeCA{SignedCert: []byte(csr)},
 			hostname:                  []string{"localhost"},
 			port:                      0,
 			expectedErr:               "",
-			expectedAuthenticatorsLen: 2,
+			expectedAuthenticatorsLen: 1, // 2 when ID token authenticators are enabled.
 			applyServerCertificateError: "tls: failed to find \"CERTIFICATE\" PEM block in certificate " +
 				"input after skipping PEM blocks of the following types: [CERTIFICATE REQUEST]",
 		},
@@ -274,7 +366,7 @@ func TestRun(t *testing.T) {
 			ca:       &mockca.FakeCA{SignedCert: []byte(csr)},
 			hostname: []string{"localhost", "fancyhost"},
 			port:     0,
-			expectedAuthenticatorsLen: 3,
+			expectedAuthenticatorsLen: 1, // 3 when ID token authenticators are enabled.
 			applyServerCertificateError: "tls: failed to find \"CERTIFICATE\" PEM block in certificate " +
 				"input after skipping PEM blocks of the following types: [CERTIFICATE REQUEST]",
 		},

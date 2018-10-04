@@ -25,7 +25,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	k8s_cr "k8s.io/cluster-registry/pkg/apis/clusterregistry/v1alpha1"
 )
 
@@ -92,36 +91,27 @@ func TestGetPilotClusters(t *testing.T) {
 		{
 			testName: "3 out of 3 Pilot in the store",
 			cs: &ClusterStore{
-				rc: map[Metadata]*RemoteCluster{
-					{
-						Name:      "cluster1",
-						Namespace: "istio-testing"}: {
+				rc: map[string]*RemoteCluster{
+					"cluster1": {
 						Cluster: &k8s_cr.Cluster{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "fakePilot1",
 							},
 						},
-						Client: &clientcmdapi.Config{},
 					},
-					{
-						Name:      "cluster2",
-						Namespace: "istio-testing"}: {
+					"cluster2": {
 						Cluster: &k8s_cr.Cluster{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "fakePilot2",
 							},
 						},
-						Client: &clientcmdapi.Config{},
 					},
-					{
-						Name:      "cluster3",
-						Namespace: "istio-testing"}: {
+					"cluster3": {
 						Cluster: &k8s_cr.Cluster{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "fakePilot3",
 							},
 						},
-						Client: &clientcmdapi.Config{},
 					},
 				},
 			},

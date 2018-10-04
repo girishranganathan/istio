@@ -4,14 +4,14 @@
 /*
 	Package config is a generated protocol buffer package.
 
-	The `bypass` adapter makes it possible to connect to gRPC based remote adapters using the inline adapter
+	The `bypass` adapter makes it possible to connect to gRPC based remote adapters using the compiled-in adapter
 	model.
 
 	This adapter supports the following templates:
-	[metric](https://istio.io/docs/reference/config/template/metric.html).
-	[checknothing](https://istio.io/docs/reference/config/template/checknothing.html).
-	[reportnothing](https://istio.io/docs/reference/config/template/reportnothing.html).
-	[quota](https://istio.io/docs/reference/config/template/quota.html).
+	[metric](https://istio.io/docs/reference/config/template/metric/).
+	[checknothing](https://istio.io/docs/reference/config/template/checknothing/).
+	[reportnothing](https://istio.io/docs/reference/config/template/reportnothing/).
+	[quota](https://istio.io/docs/reference/config/template/quota/).
 
 	Example configuration:
 	```

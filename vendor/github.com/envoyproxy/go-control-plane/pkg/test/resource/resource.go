@@ -91,8 +91,12 @@ func MakeCluster(mode string, clusterName string) *v2.Cluster {
 		edsSource = &core.ConfigSource{
 			ConfigSourceSpecifier: &core.ConfigSource_ApiConfigSource{
 				ApiConfigSource: &core.ApiConfigSource{
-					ApiType:      core.ApiConfigSource_GRPC,
-					ClusterNames: []string{XdsCluster},
+					ApiType: core.ApiConfigSource_GRPC,
+					GrpcServices: []*core.GrpcService{{
+						TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
+							EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
+						},
+					}},
 				},
 			},
 		}
@@ -155,8 +159,12 @@ func MakeHTTPListener(mode string, listenerName string, port uint32, route strin
 	case Xds:
 		rdsSource.ConfigSourceSpecifier = &core.ConfigSource_ApiConfigSource{
 			ApiConfigSource: &core.ApiConfigSource{
-				ApiType:      core.ApiConfigSource_GRPC,
-				ClusterNames: []string{XdsCluster},
+				ApiType: core.ApiConfigSource_GRPC,
+				GrpcServices: []*core.GrpcService{{
+					TargetSpecifier: &core.GrpcService_EnvoyGrpc_{
+						EnvoyGrpc: &core.GrpcService_EnvoyGrpc{ClusterName: XdsCluster},
+					},
+				}},
 			},
 		}
 	case Rest:
@@ -237,7 +245,9 @@ func MakeTCPListener(listenerName string, port uint32, clusterName string) *v2.L
 	// TCP filter configuration
 	config := &tcp.TcpProxy{
 		StatPrefix: "tcp",
-		Cluster:    clusterName,
+		ClusterSpecifier: &tcp.TcpProxy_Cluster{
+			Cluster: clusterName,
+		},
 	}
 	pbst, err := util.MessageToStruct(config)
 	if err != nil {

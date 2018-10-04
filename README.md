@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/istio/istio.svg?style=shield)](https://circleci.com/gh/istio/istio)
 [![Go Report Card](https://goreportcard.com/badge/github.com/istio/istio)](https://goreportcard.com/report/github.com/istio/istio)
-[![GoDoc](https://godoc.org/github.com/istio/istio?status.svg)](https://godoc.org/github.com/istio/istio)
+[![GoDoc](https://godoc.org/istio.io/istio?status.svg)](https://godoc.org/istio.io/istio)
 [![codecov.io](https://codecov.io/github/istio/istio/coverage.svg?branch=master)](https://codecov.io/github/istio/istio?branch=master)
 
 An open platform to connect, manage, and secure microservices.
@@ -53,9 +53,9 @@ Istio is composed of these components:
 
 - **Node Agent** - A per-node component responsible for certificate issuance and rotation.
 
-- **Broker** - A component implementing the [Open Service Broker API](https://github.com/openservicebrokerapi/servicebroker) for Istio-based services. (Under development)
+- **Galley**- Central component for validating, ingesting, aggregating, transforming and distributing config within Istio.
 
-Istio currently supports Kubernetes, Consul, and Eureka-based environments. We plan support for additional platforms such as
+Istio currently supports Kubernetes and Consul-based environments. We plan support for additional platforms such as
 Cloud Foundry, and Mesos in the near future.
 
 ## Repositories
@@ -72,7 +72,7 @@ including Citadel (acting as Certificate Authority), node agent, etc.
 contains platform-specific code to populate the
 [abstract service model](https://istio.io/docs/concepts/traffic-management/overview.html), dynamically reconfigure the proxies
 when the application topology changes, as well as translate
-[routing rules](https://istio.io/docs/reference/config/traffic-rules/routing-rules.html) into proxy specific configuration.
+[routing rules](https://istio.io/docs/reference/config/istio.networking.v1alpha3/) into proxy specific configuration.
   - [istioctl](istioctl/). This directory contains code for the
 [_istioctl_](https://istio.io/docs/reference/commands/istioctl.html) command line utility.
   - [mixer](mixer/). This directory
@@ -80,8 +80,6 @@ contains code to enforce various policies for traffic passing through the
 proxies, and collect telemetry data from proxies and services. There
 are plugins for interfacing with various cloud platforms, policy
 management services, and monitoring services.
-  - [broker](broker/). This directory
-contains code for Istio's implementation of the Open Service Broker API.
 
 - [istio/api](https://github.com/istio/api). This repository defines
 component-level APIs and common configuration formats for the Istio platform.

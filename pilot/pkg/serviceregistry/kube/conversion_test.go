@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	"time"
+
 	"istio.io/istio/pilot/pkg/model"
 )
 
@@ -65,20 +67,22 @@ func TestServiceConversion(t *testing.T) {
 	namespace := "default"
 	saA := "serviceaccountA"
 	saB := "serviceaccountB"
-	saC := "serviceaccountC@cloudservices.gserviceaccount.com"
-	saD := "serviceaccountD@developer.gserviceaccount.com"
+	saC := "spiffe://accounts.google.com/serviceaccountC@cloudservices.gserviceaccount.com"
+	saD := "spiffe://accounts.google.com/serviceaccountD@developer.gserviceaccount.com"
 
 	ip := "10.0.0.1"
 
+	tnow := time.Now()
 	localSvc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				KubeServiceAccountsOnVMAnnotation:      saA + "," + saB,
-				CanonicalServiceAccountsOnVMAnnotation: saC + "," + saD,
-				"other/annotation":                     "test",
+				KubeServiceAccountsOnVMAnnotation:  saA + "," + saB,
+				CanonicalServiceAccountsAnnotation: saC + "," + saD,
+				"other/annotation":                 "test",
 			},
+			CreationTimestamp: metav1.Time{tnow},
 		},
 		Spec: v1.ServiceSpec{
 			ClusterIP: ip,
@@ -100,6 +104,10 @@ func TestServiceConversion(t *testing.T) {
 	service := convertService(localSvc, domainSuffix)
 	if service == nil {
 		t.Errorf("could not convert service")
+	}
+
+	if service.CreationTime != tnow {
+		t.Errorf("incorrect creation time => %v, want %v", service.CreationTime, tnow)
 	}
 
 	if len(service.Ports) != len(localSvc.Spec.Ports) {
@@ -125,10 +133,9 @@ func TestServiceConversion(t *testing.T) {
 		t.Errorf("number of service accounts is incorrect")
 	}
 	expected := []string{
+		saC, saD,
 		"spiffe://company.com/ns/default/sa/" + saA,
 		"spiffe://company.com/ns/default/sa/" + saB,
-		"spiffe://" + saC,
-		"spiffe://" + saD,
 	}
 	if !reflect.DeepEqual(sa, expected) {
 		t.Errorf("Unexpected service accounts %v (expecting %v)", sa, expected)
@@ -207,7 +214,7 @@ func TestExternalServiceConversion(t *testing.T) {
 			len(service.Ports), len(extSvc.Spec.Ports))
 	}
 
-	if service.ExternalName != model.Hostname(extSvc.Spec.ExternalName) || !service.External() {
+	if !service.External() {
 		t.Error("service should be external")
 	}
 
@@ -301,60 +308,5 @@ func TestProbesToPortsConversion(t *testing.T) {
 					len(mgmtPorts), len(expected))
 			}
 		}
-	}
-}
-
-func TestParseKubeServiceNode(t *testing.T) {
-	var svcNode model.Proxy
-	ipaddr := "128.0.0.1"
-	kubeNodes := make(map[string]*kubeServiceNode)
-
-	svcNode.ID = "router.default"
-	svcNode.Domain = "default.svc.cluster.local"
-
-	err := parseKubeServiceNode(ipaddr, &svcNode, kubeNodes)
-	if err != nil {
-		t.Errorf("expected successful return from parseKubeServiceNode, "+
-			"got err = %v", err)
-	}
-
-	if kubeNodes[ipaddr].PodName != "router" || kubeNodes[ipaddr].Domain != svcNode.Domain ||
-		kubeNodes[ipaddr].Namespace != "default" {
-		t.Errorf("invalid kubeNodes, expected PodName=router got %s "+
-			"expected Domain=%s got %s expected Namespace='default' got %s",
-			kubeNodes[ipaddr].PodName, svcNode.Domain, kubeNodes[ipaddr].Domain,
-			kubeNodes[ipaddr].Namespace)
-	}
-}
-
-func TestParseKubeServiceNodeErrors(t *testing.T) {
-	var svcNode model.Proxy
-	ipaddr := "128.0.0.1"
-	kubeNodes := make(map[string]*kubeServiceNode)
-
-	svcNode.ID = "invalidID"
-	err := parseKubeServiceNode(ipaddr, &svcNode, kubeNodes)
-	if err == nil {
-		t.Errorf("expected 'invalid ID' error message")
-	}
-
-	svcNode.ID = "router.default"
-	svcNode.Domain = "invalid.domain"
-	err = parseKubeServiceNode(ipaddr, &svcNode, kubeNodes)
-	if err == nil {
-		t.Errorf("expected 'invalid node domain format' error message")
-	}
-
-	svcNode.Domain = "default.svc.cluster.localinvalid"
-	err = parseKubeServiceNode(ipaddr, &svcNode, kubeNodes)
-	if err == nil {
-		t.Errorf("expected 'invalid node domain' error message")
-	}
-
-	svcNode.ID = "router.defaultDifferentNamespace"
-	svcNode.Domain = "default.svc.cluster.local"
-	err = parseKubeServiceNode(ipaddr, &svcNode, kubeNodes)
-	if err == nil {
-		t.Errorf("expected 'namespace in ID must be equal' error message")
 	}
 }

@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 #
 # Early version of a downloader/installer for Istio
 #
@@ -11,7 +11,7 @@
 # and is updated more often.
 
 # DO NOT UPDATE THIS VERSION OR SCRIPT LIGHTLY - THIS IS THE "STABLE" VERSION
-ISTIO_VERSION="0.8.0"
+ISTIO_VERSION="1.0.2"
 
 NAME="istio-$ISTIO_VERSION"
 OS="$(uname)"
@@ -26,6 +26,6 @@ echo "Downloading $NAME from $URL ..."
 curl -L "$URL" | tar xz
 echo "Downloaded into $NAME:"
 ls $NAME
-BINDIR="$(cd $NAME/bin; pwd)"
+BINDIR="$(cd $NAME/bin && pwd)"
 echo "Add $BINDIR to your path; e.g copy paste in your shell and/or ~/.profile:"
 echo "export PATH=\"\$PATH:$BINDIR\""

@@ -1,4 +1,4 @@
-// Copyright 2017 the Istio Authors.
+// Copyright 2017 Istio Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,11 @@ type Metadata struct {
 }
 
 // MetadataGenerator creates metadata based on the given metadata functions.
-type MetadataGenerator struct {
+type MetadataGenerator interface {
+	GenerateMetadata() Metadata
+}
+
+type metadataGeneratorImpl struct {
 	shouldFill    shouldFillFn
 	projectIDFn   metadataFn
 	locationFn    metadataFn
@@ -40,8 +44,8 @@ type MetadataGenerator struct {
 }
 
 // NewMetadataGenerator creates a MetadataGenerator with the given functions.
-func NewMetadataGenerator(shouldFill shouldFillFn, projectIDFn, locationFn, clusterNameFn metadataFn) *MetadataGenerator {
-	return &MetadataGenerator{
+func NewMetadataGenerator(shouldFill shouldFillFn, projectIDFn, locationFn, clusterNameFn metadataFn) MetadataGenerator {
+	return &metadataGeneratorImpl{
 		shouldFill:    shouldFill,
 		projectIDFn:   projectIDFn,
 		locationFn:    locationFn,
@@ -50,7 +54,7 @@ func NewMetadataGenerator(shouldFill shouldFillFn, projectIDFn, locationFn, clus
 }
 
 // GenerateMetadata generates a Metadata struct if the condition is fulfilled.
-func (mg *MetadataGenerator) GenerateMetadata() Metadata {
+func (mg *metadataGeneratorImpl) GenerateMetadata() Metadata {
 	var md Metadata
 	if !mg.shouldFill() {
 		return md

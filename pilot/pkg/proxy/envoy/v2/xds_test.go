@@ -29,6 +29,7 @@ import (
 	testenv "istio.io/istio/mixer/test/client/env"
 	"istio.io/istio/pilot/pkg/bootstrap"
 	"istio.io/istio/pilot/pkg/model"
+	"istio.io/istio/pkg/test/env"
 	"istio.io/istio/tests/util"
 )
 
@@ -71,13 +72,13 @@ func startEnvoy(t *testing.T) {
 		return
 	}
 
-	tmplB, err := ioutil.ReadFile(util.IstioSrc + "/tests/testdata/bootstrap_tmpl.json")
+	tmplB, err := ioutil.ReadFile(env.IstioSrc + "/tests/testdata/bootstrap_tmpl.json")
 	if err != nil {
 		t.Fatal("Can't read bootstrap template", err)
 	}
 	testEnv.EnvoyTemplate = string(tmplB)
 	nodeId := sidecarId(app3Ip, "app3")
-	testEnv.EnvoyParams = []string{"--service-cluster", "serviceCluster", "--service-node", nodeId, "--v2-config-only"}
+	testEnv.EnvoyParams = []string{"--service-cluster", "serviceCluster", "--service-node", nodeId}
 	testEnv.EnvoyConfigOpt = map[string]interface{}{
 		"NodeID": nodeId,
 	}
@@ -114,13 +115,13 @@ func initLocalPilotTestEnv(t *testing.T) *bootstrap.Server {
 		return pilotServer
 	}
 	testEnv = testenv.NewTestSetup(testenv.XDSTest, t)
-	server := util.EnsureTestServer()
+	server, _ := util.EnsureTestServer()
 	pilotServer = server
 
 	testEnv.Ports().PilotGrpcPort = uint16(util.MockPilotGrpcPort)
 	testEnv.Ports().PilotHTTPPort = uint16(util.MockPilotHTTPPort)
-	testEnv.IstioSrc = util.IstioSrc
-	testEnv.IstioOut = util.IstioOut
+	testEnv.IstioSrc = env.IstioSrc
+	testEnv.IstioOut = env.IstioOut
 
 	localIp = getLocalIP()
 
@@ -299,6 +300,7 @@ func testPorts(base int) []*model.Port {
 
 // Test XDS with real envoy and with mixer.
 func TestEnvoy(t *testing.T) {
+	t.Skip("https://github.com/istio/istio/issues/7869")
 	defer func() {
 		if testEnv != nil {
 			testEnv.TearDown()

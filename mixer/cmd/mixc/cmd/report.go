@@ -16,10 +16,12 @@ package cmd
 
 import (
 	"context"
+	"sync"
 
 	ot "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/spf13/cobra"
+	"golang.org/x/time/rate"
 
 	mixerpb "istio.io/api/mixer/v1"
 	"istio.io/istio/mixer/cmd/shared"
@@ -33,7 +35,7 @@ func reportCmd(rootArgs *rootArgs, printf, fatalf shared.FormatFn) *cobra.Comman
 			"expects a set of attributes as input, which it uses, along with\n" +
 			"its configuration, to determine which adapters to invoke and with\n" +
 			"which parameters in order to output the telemetry.",
-
+		Args: cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			report(rootArgs, printf, fatalf)
 		}}
@@ -55,12 +57,31 @@ func report(rootArgs *rootArgs, printf, fatalf shared.FormatFn) {
 
 	span, ctx := ot.StartSpanFromContext(context.Background(), "mixc Report", ext.SpanKindRPCClient)
 
-	for i := 0; i < rootArgs.repeat; i++ {
-		request := mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{*attrs}}
-		_, err := cs.client.Report(ctx, &request)
-
-		printf("Report RPC returned %s", decodeError(err))
+	var rl *rate.Limiter
+	if rootArgs.rate > 0 {
+		rl = rate.NewLimiter(rate.Limit(rootArgs.rate), rootArgs.rate)
 	}
+	if rootArgs.concurrency < 1 {
+		fatalf("concurrency has to be at least 1")
+	}
+	var wg sync.WaitGroup
+	wg.Add(rootArgs.concurrency)
+	for c := 0; c < rootArgs.concurrency; c++ {
+		go func() {
+			defer wg.Done()
+			for i := 0; i < rootArgs.repeat; i++ {
+				if rl != nil {
+					rl.Wait(context.Background())
+				}
+				request := mixerpb.ReportRequest{Attributes: []mixerpb.CompressedAttributes{*attrs}}
+				_, err := cs.client.Report(ctx, &request)
 
+				if rootArgs.printResponse {
+					printf("Report RPC returned %s", decodeError(err))
+				}
+			}
+		}()
+	}
+	wg.Wait()
 	span.Finish()
 }

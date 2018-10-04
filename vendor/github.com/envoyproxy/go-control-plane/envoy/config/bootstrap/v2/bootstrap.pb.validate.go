@@ -81,6 +81,16 @@ func (m *Bootstrap) Validate() error {
 		}
 	}
 
+	if v, ok := interface{}(m.GetHdsConfig()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BootstrapValidationError{
+				Field:  "HdsConfig",
+				Reason: "embedded message failed validation",
+				Cause:  err,
+			}
+		}
+	}
+
 	// no validation rules for FlagsPath
 
 	for idx, item := range m.GetStatsSinks() {
@@ -162,6 +172,16 @@ func (m *Bootstrap) Validate() error {
 		if err := v.Validate(); err != nil {
 			return BootstrapValidationError{
 				Field:  "Admin",
+				Reason: "embedded message failed validation",
+				Cause:  err,
+			}
+		}
+	}
+
+	if v, ok := interface{}(m.GetOverloadManager()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return BootstrapValidationError{
+				Field:  "OverloadManager",
 				Reason: "embedded message failed validation",
 				Cause:  err,
 			}
