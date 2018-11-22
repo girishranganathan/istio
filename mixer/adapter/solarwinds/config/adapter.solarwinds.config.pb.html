@@ -1,6 +1,6 @@
 ---
 title: SolarWinds
-description: Adapter to deliver logs and metrics to Papertrail and AppOptics backends
+description: Adapter to deliver logs and metrics to Papertrail and AppOptics backends.
 location: https://istio.io/docs/reference/config/policy-and-telemetry/adapters/solarwinds.html
 layout: protoc-gen-docs
 generator: protoc-gen-docs
@@ -100,7 +100,7 @@ will NOT be shipped to AppOptics</p>
 <td>
 <p>Optional. Max batch size of metrics to be sent to AppOptics.
 AppOptics does not allow batch size greater than 1000.
-If this is unspecified or given a value 0 explicitely, a default batch size of 1000 will be used.</p>
+If this is unspecified or given a value 0 explicitly, a default batch size of 1000 will be used.</p>
 
 </td>
 </tr>
@@ -113,12 +113,28 @@ dropped.</p>
 
 </td>
 </tr>
+<tr id="Params-papertrail_protocol">
+<td><code>papertrailProtocol</code></td>
+<td><code>string</code></td>
+<td>
+<p>Syslog protocol to use when shipping logs to papertrail. It can be either udp, tcp or tcp+tls</p>
+
+</td>
+</tr>
 <tr id="Params-papertrail_local_retention_duration">
 <td><code>papertrailLocalRetentionDuration</code></td>
 <td><code><a href="https://developers.google.com/protocol-buffers/docs/reference/google.protobuf#duration">google.protobuf.Duration</a></code></td>
 <td>
 <p>This is the duration for which logs will be persisted locally until it is shipped to papertrail in the event
 of a network failure. Default value is 1 hour.</p>
+
+</td>
+</tr>
+<tr id="Params-loggly_token">
+<td><code>logglyToken</code></td>
+<td><code>string</code></td>
+<td>
+<p>Loggly token needed to send logs to Loggly. If not token is given then logs will NOT be shipped to Loggly.</p>
 
 </td>
 </tr>
