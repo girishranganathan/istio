@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 // $title: SolarWinds
-// $description: Adapter to deliver logs and metrics to Papertrail and AppOptics backends
+// $description: Adapter to deliver logs and metrics to Papertrail and AppOptics backends.
 // $location: https://istio.io/docs/reference/config/policy-and-telemetry/adapters/solarwinds.html
 // $aliases:
 // $  - /docs/reference/config/adapters/solarwinds.html
@@ -101,16 +101,24 @@ message Params {
 
     // Optional. Max batch size of metrics to be sent to AppOptics.
     // AppOptics does not allow batch size greater than 1000.
-    // If this is unspecified or given a value 0 explicitely, a default batch size of 1000 will be used.
+    // If this is unspecified or given a value 0 explicitly, a default batch size of 1000 will be used.
     int32 appoptics_batch_size = 2;
 
     // Papertrail url to ship logs to. If no papertrail url is given then the logs will NOT be shipped but rather
     // dropped.
     string papertrail_url = 3;
 
+    // Syslog protocol to use when shipping logs to papertrail. It can be either udp, tcp or tcp+tls
+    string papertrail_protocol = 4;
+
     // This is the duration for which logs will be persisted locally until it is shipped to papertrail in the event
     // of a network failure. Default value is 1 hour.
-    google.protobuf.Duration papertrail_local_retention_duration = 4 [(gogoproto.nullable)=true, (gogoproto.stdduration) = true];
+    google.protobuf.Duration papertrail_local_retention_duration = 5 [(gogoproto.nullable)=true, (gogoproto.stdduration) = true];
+
+
+    // Loggly token needed to send logs to Loggly. If not token is given then logs will NOT be shipped to Loggly.
+    string loggly_token = 6;
+
 
     // Describes how to represent an Istio metric in Solarwinds AppOptics
     message MetricInfo {
@@ -119,7 +127,7 @@ message Params {
     }
 
     // A map of Istio metric name to solarwinds metric info.
-    map<string, MetricInfo> metrics = 5;
+    map<string, MetricInfo> metrics = 7;
 
     // Describes how to represent an Istio log entry in Solarwinds AppOptics
     message LogInfo {
@@ -136,5 +144,5 @@ message Params {
     }
 
     // A map of Istio logentry name to solarwinds log info.
-    map<string, LogInfo> logs = 6;
+    map<string, LogInfo> logs = 8;
 }
